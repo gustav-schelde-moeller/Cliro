@@ -229,7 +229,7 @@ input,select{ font-family:inherit; }
 .team-switcher{ position:relative; flex:1; min-width:0; }
 .team-switcher-trigger{
   display:flex; align-items:center; gap:6px; width:100%; border:none; background:none; cursor:pointer;
-  font-family:inherit; text-align:left; padding:4px; margin:-4px; border-radius:8px; min-width:0;
+  font-family:inherit; text-align:left; padding:4px; margin:-4px; border-radius:8px; min-width:0; color:inherit;
 }
 .team-switcher-trigger:hover{ background:var(--surface-2); }
 .team-switcher-trigger > div:first-child{ min-width:0; flex:1; }
@@ -414,6 +414,13 @@ input,select{ font-family:inherit; }
 .drawer-close{ background:var(--surface-2); border:1px solid var(--border); color:var(--text-muted); width:30px; height:30px; border-radius:9px; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 .drawer-close:hover{ color:var(--text); border-color:var(--accent); }
 .drawer-body{ padding:18px 20px 28px; overflow-y:auto; flex:1; }
+.modal-panel{
+  position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:min(360px, calc(100vw - 32px));
+  background:var(--surface); border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow); z-index:41;
+}
+.modal-head{ padding:16px 18px 12px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.modal-head h3{ font-size:15px; margin:0; font-weight:700; }
+.modal-body{ padding:16px 18px 18px; display:flex; flex-direction:column; gap:10px; }
 .section-label{ font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-faint); font-weight:600; margin:20px 0 8px; }
 .section-label:first-child{ margin-top:0; }
 .breakdown{ display:flex; flex-direction:column; gap:8px; }
