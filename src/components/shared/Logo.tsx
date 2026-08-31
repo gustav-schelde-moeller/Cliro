@@ -1,0 +1,28 @@
+export function LogoMark({ size = 24 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 200 200" width={size} height={size}>
+      <path
+        d="M 151.40 46.77 A 74.00 74.00 0 1 0 151.40 153.23"
+        fill="none"
+        stroke="#2F55FC"
+        strokeWidth="16"
+        strokeLinecap="round"
+      />
+      <path
+        d="M 132.65 66.19 A 47.00 47.00 0 1 0 132.65 133.81"
+        fill="none"
+        stroke="#2F55FC"
+        strokeWidth="16"
+        strokeLinecap="round"
+      />
+      <path
+        d="M 114.85 85.15 A 21.00 21.00 0 1 0 114.85 114.85"
+        fill="none"
+        stroke="#2F55FC"
+        strokeWidth="16"
+        strokeLinecap="round"
+      />
+      <circle cx="157" cy="100" r="15" fill="#2F55FC" />
+    </svg>
+  );
+}
