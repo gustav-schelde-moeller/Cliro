@@ -89,6 +89,16 @@ export async function leaveTeamAction(teamId: string) {
   redirect("/");
 }
 
+export async function deleteTeamAction(teamId: string) {
+  const user = await requireUser();
+  const ctx = await getMembershipContext(teamId, user.id);
+  if (!ctx || !ctx.isOwner) throw new Error("Kun teamets ejer kan slette teamet.");
+
+  await prisma.team.delete({ where: { id: teamId } });
+  await clearActiveTeamId();
+  redirect("/");
+}
+
 export async function switchTeamAction(teamId: string) {
   const user = await requireUser();
   const membership = await prisma.teamMember.findUnique({ where: { teamId_userId: { teamId, userId: user.id } } });

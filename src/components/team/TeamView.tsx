@@ -5,14 +5,7 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/shared/Avatar";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
 import { statusLabel } from "@/lib/status";
-import {
-  inviteEmailAction,
-  removeMemberAction,
-  setRoleAction,
-  joinTeamAction,
-  leaveTeamAction,
-  type ActionResult,
-} from "@/lib/actions/team-actions";
+import { inviteEmailAction, removeMemberAction, setRoleAction, type ActionResult } from "@/lib/actions/team-actions";
 
 type MemberLead = { id: number; name: string; industry: string; status: string };
 type Member = {
@@ -77,19 +70,6 @@ export function TeamView({
   );
 
   const [copiedCode, setCopiedCode] = useState(false);
-  const [joinState, joinFormAction, joinPending] = useActionState(joinTeamAction, initialInviteState);
-  const [leaveConfirming, setLeaveConfirming] = useState(false);
-  const [leavePending, startLeaveTransition] = useTransition();
-
-  function handleLeave() {
-    startLeaveTransition(async () => {
-      try {
-        await leaveTeamAction(teamId);
-      } catch (err) {
-        showToast(errorMessage(err, "Kunne ikke forlade teamet."));
-      }
-    });
-  }
 
   async function copyCode() {
     try {
@@ -161,43 +141,6 @@ export function TeamView({
         <div className="distance-note" style={{ marginTop: 10 }}>
           Koden virker for alle, uanset hvilken computer de bruger.
         </div>
-      </div>
-
-      <div className="panel-card" style={{ marginBottom: 16 }}>
-        <h3>Skift team</h3>
-        <div className="switch-team-row">
-          <form className="join-team-form" action={joinFormAction}>
-            <input
-              type="text"
-              name="code"
-              className="field"
-              placeholder="Invitationskode til et andet team"
-              maxLength={12}
-              style={{ textTransform: "uppercase" }}
-              required
-            />
-            <button type="submit" className="btn" disabled={joinPending}>
-              {joinPending ? "Joiner…" : "Join team"}
-            </button>
-          </form>
-          {!isOwner ? (
-            leaveConfirming ? (
-              <div className="delete-confirm-row">
-                <button type="button" className="btn" disabled={leavePending} onClick={() => setLeaveConfirming(false)}>
-                  Fortryd
-                </button>
-                <button type="button" className="btn danger" disabled={leavePending} onClick={handleLeave}>
-                  {leavePending ? "Forlader…" : "Ja, forlad teamet"}
-                </button>
-              </div>
-            ) : (
-              <button type="button" className="btn danger" onClick={() => setLeaveConfirming(true)}>
-                Forlad dette team
-              </button>
-            )
-          ) : null}
-        </div>
-        {joinState.error ? <p style={{ color: "var(--bad)", fontSize: 12.5, marginTop: 8 }}>{joinState.error}</p> : null}
       </div>
 
       <div className="grid-cols">

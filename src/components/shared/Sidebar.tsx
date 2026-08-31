@@ -1,8 +1,11 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoMark } from "./Logo";
+import { useToast, errorMessage } from "./ToastProvider";
+import { switchTeamAction, joinTeamAction, type ActionResult } from "@/lib/actions/team-actions";
 
 const NAV_ITEMS = [
   {
@@ -50,7 +53,120 @@ const NAV_ITEMS = [
   },
 ];
 
-export function Sidebar({ teamName, companyCount }: { teamName: string; companyCount: number }) {
+const initialJoinState: ActionResult = {};
+
+function TeamSwitcher({
+  teamName,
+  teamId,
+  userTeams,
+}: {
+  teamName: string;
+  teamId: string;
+  userTeams: { id: string; name: string }[];
+}) {
+  const { showToast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [switching, startSwitching] = useTransition();
+  const [joining, startJoining] = useTransition();
+
+  function close() {
+    setOpen(false);
+    setJoinOpen(false);
+    setJoinCode("");
+  }
+
+  function handleSwitch(id: string) {
+    if (id === teamId) return close();
+    startSwitching(async () => {
+      try {
+        await switchTeamAction(id);
+      } catch (err) {
+        showToast(errorMessage(err, "Kunne ikke skifte team."));
+      }
+    });
+  }
+
+  function handleJoin() {
+    if (!joinCode.trim()) return;
+    startJoining(async () => {
+      const fd = new FormData();
+      fd.append("code", joinCode);
+      try {
+        const result = await joinTeamAction(initialJoinState, fd);
+        if (result?.error) showToast(result.error);
+      } catch (err) {
+        showToast(errorMessage(err, "Kunne ikke joine teamet."));
+      }
+    });
+  }
+
+  return (
+    <div className="team-switcher">
+      <button type="button" className="team-switcher-trigger" onClick={() => setOpen((v) => !v)} aria-label="Skift eller join team">
+        <div style={{ minWidth: 0 }}>
+          <b>CLIRO</b>
+          <div className="sidebar-team-name">{teamName}</div>
+        </div>
+        <span className="kebab-dots">⋯</span>
+      </button>
+      {open ? (
+        <>
+          <div className="team-switcher-backdrop" onClick={close} />
+          <div className="team-switcher-dropdown">
+            {userTeams.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className="status-opt"
+                disabled={switching}
+                onClick={() => handleSwitch(t.id)}
+              >
+                <span className={`team-dot${t.id === teamId ? " active" : ""}`} />
+                {t.name}
+              </button>
+            ))}
+            <div className="team-switcher-divider" />
+            {joinOpen ? (
+              <div className="team-switcher-join">
+                <input
+                  type="text"
+                  className="field"
+                  placeholder="Invitationskode"
+                  maxLength={12}
+                  style={{ textTransform: "uppercase" }}
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value)}
+                  autoFocus
+                />
+                <button type="button" className="btn primary" disabled={joining} onClick={handleJoin}>
+                  {joining ? "…" : "Join"}
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="status-opt" onClick={() => setJoinOpen(true)}>
+                + Join et team
+              </button>
+            )}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+export function Sidebar({
+  teamName,
+  teamId,
+  userTeams,
+  companyCount,
+}: {
+  teamName: string;
+  teamId: string;
+  userTeams: { id: string; name: string }[];
+  companyCount: number;
+}) {
   const pathname = usePathname();
 
   return (
@@ -59,10 +175,7 @@ export function Sidebar({ teamName, companyCount }: { teamName: string; companyC
         <div className="sidebar-brand-mark">
           <LogoMark size={30} />
         </div>
-        <div style={{ minWidth: 0 }}>
-          <b>CLIRO</b>
-          <div className="sidebar-team-name">{teamName}</div>
-        </div>
+        <TeamSwitcher teamName={teamName} teamId={teamId} userTeams={userTeams} />
       </div>
       <nav className="sidebar-nav">
         {NAV_ITEMS.map((item) => (
@@ -75,6 +188,17 @@ export function Sidebar({ teamName, companyCount }: { teamName: string; companyC
           </Link>
         ))}
       </nav>
+      <Link href="/indstillinger" className={`nav-item settings-link${pathname === "/indstillinger" ? " active" : ""}`}>
+        <svg viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.7" />
+          <path
+            d="M19.4 13.5a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V19.4a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H4.6a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H10.5a1.65 1.65 0 0 0 1-1.51V4.6a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V10.5a1.65 1.65 0 0 0 1.51 1H19.4a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+            stroke="currentColor"
+            strokeWidth="1.3"
+          />
+        </svg>
+        <span>Indstillinger</span>
+      </Link>
     </aside>
   );
 }

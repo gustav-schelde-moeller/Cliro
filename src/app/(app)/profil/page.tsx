@@ -16,13 +16,5 @@ export default async function ProfilPage() {
 
   const team = teamId ? await prisma.team.findUnique({ where: { id: teamId } }) : null;
 
-  return (
-    <ProfilView
-      name={user.name}
-      email={user.email}
-      avatarDataUrl={user.avatarDataUrl}
-      teamName={team?.name ?? "—"}
-      hasPassword={Boolean(user.passwordHash)}
-    />
-  );
+  return <ProfilView name={user.name} email={user.email} avatarDataUrl={user.avatarDataUrl} teamName={team?.name ?? "—"} />;
 }
