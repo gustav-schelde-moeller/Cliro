@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getActiveTeamId } from "@/lib/session-team";
-import { getTeamLeadsMap, getActivityLog } from "@/lib/queries";
+import { getTeamLeadsMap, getActivityLog, getUserStars } from "@/lib/queries";
 import { COMPANIES } from "@/lib/companies";
-import { STATUS_DEFS, statusLabel } from "@/lib/status";
+import { STATUS_DEFS } from "@/lib/status";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
+import { DashboardInProgress } from "@/components/dashboard/DashboardInProgress";
 import { prisma } from "@/lib/prisma";
 
 function timeAgo(ts: Date): string {
@@ -23,10 +24,11 @@ export default async function DashboardPage() {
   const teamId = await getActiveTeamId(session.user.id);
   if (!teamId) redirect("/team-gate");
 
-  const [leadsMap, activity, starCount] = await Promise.all([
+  const [leadsMap, activity, starCount, userStars] = await Promise.all([
     getTeamLeadsMap(teamId),
     getActivityLog(teamId, 20),
     prisma.star.count({ where: { userId: session.user.id } }),
+    getUserStars(session.user.id),
   ]);
 
   const counts: Record<string, number> = { new: 0, contacted: 0, meeting: 0, won: 0, lost: 0 };
@@ -42,6 +44,8 @@ export default async function DashboardPage() {
     const lead = leadsMap.get(c.id);
     return lead && (lead.status !== "new" || lead.assigneeId);
   });
+  const activeLeads: Record<number, { status: string; assigneeId: string | null; assigneeName: string | null }> = {};
+  for (const c of activeCompanies) activeLeads[c.id] = leadsMap.get(c.id)!;
 
   return (
     <section>
@@ -86,23 +90,13 @@ export default async function DashboardPage() {
 
       <div className="panel-card" style={{ marginTop: 16 }}>
         <h3>Virksomheder i gang</h3>
-        {activeCompanies.length === 0 ? (
-          <div className="dash-empty">Ingen virksomheder i gang endnu. Tildel en virksomhed eller sæt en status for at komme i gang.</div>
-        ) : (
-          activeCompanies.map((c) => {
-            const lead = leadsMap.get(c.id)!;
-            return (
-              <div className="inprogress-row" key={c.id}>
-                <span className="status-pill" data-status={lead.status}>
-                  {statusLabel(lead.status)}
-                </span>
-                <b>{c.name}</b>
-                <span className="tag">{c.industry}</span>
-                {lead.assigneeName ? <span className="assignee-chip">👤 {lead.assigneeName}</span> : null}
-              </div>
-            );
-          })
-        )}
+        <DashboardInProgress
+          companies={activeCompanies}
+          teamId={teamId}
+          myName={session.user.name ?? "Ukendt"}
+          initialLeads={activeLeads}
+          initialStars={[...userStars]}
+        />
       </div>
     </section>
   );

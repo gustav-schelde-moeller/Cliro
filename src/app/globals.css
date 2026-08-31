@@ -465,6 +465,11 @@ input,select{ font-family:inherit; }
 .inprogress-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); font-size:12.5px; flex-wrap:wrap; }
 .inprogress-row:last-child{ border-bottom:none; }
 .inprogress-row b{ font-size:13px; }
+.inprogress-row-clickable{
+  background:none; border:none; text-align:left; cursor:pointer; font-family:inherit; color:var(--text);
+  border-radius:8px; margin:0 -8px; padding:9px 8px; width:calc(100% + 16px);
+}
+.inprogress-row-clickable:hover{ background:var(--surface-2); }
 
 /* ===== profil page ===== */
 .profil-row{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 0; border-bottom:1px solid var(--border); }
