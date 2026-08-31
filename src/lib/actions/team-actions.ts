@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { genTeamCode } from "@/lib/team-code";
-import { setActiveTeamId } from "@/lib/session-team";
+import { setActiveTeamId, clearActiveTeamId } from "@/lib/session-team";
 import { sendEmail, inviteEmail } from "@/lib/email";
 
 export type ActionResult = { error?: string; ok?: boolean };
@@ -75,6 +75,18 @@ export async function joinTeamAction(_prev: ActionResult, formData: FormData): P
 
   await setActiveTeamId(team.id);
   redirect("/virksomheder");
+}
+
+export async function leaveTeamAction(teamId: string) {
+  const user = await requireUser();
+  const ctx = await getMembershipContext(teamId, user.id);
+  if (!ctx || !ctx.membership) throw new Error("Du er ikke medlem af det team.");
+  if (ctx.isOwner) throw new Error("Du er ejer af teamet og kan ikke forlade det — gør et andet medlem til ejer først, eller slet teamet.");
+
+  await prisma.teamMember.delete({ where: { teamId_userId: { teamId, userId: user.id } } });
+  await prisma.lead.updateMany({ where: { teamId, assigneeId: user.id }, data: { assigneeId: null } });
+  await clearActiveTeamId();
+  redirect("/");
 }
 
 export async function switchTeamAction(teamId: string) {

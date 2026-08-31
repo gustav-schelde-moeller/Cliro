@@ -57,7 +57,7 @@ export function Sidebar({ teamName, companyCount }: { teamName: string; companyC
     <aside className="sidebar">
       <div className="sidebar-brand">
         <div className="sidebar-brand-mark">
-          <LogoMark size={24} />
+          <LogoMark size={30} />
         </div>
         <div style={{ minWidth: 0 }}>
           <b>CLIRO</b>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { INDUSTRIES, haversineKm, type Company } from "@/lib/companies";
 import { LeadCard, type LeadState } from "./LeadCard";
@@ -87,6 +87,23 @@ export function VirksomhederView({
   }, [companies, search, tier, industries, named, directEmail, starOnly, myLocation, maxDistance, sort, starred]);
 
   const visible = filtered.slice(0, visibleCount);
+  const hasMore = filtered.length > visible.length;
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!hasMore) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setVisibleCount((v) => v + PAGE_SIZE);
+      },
+      { rootMargin: "600px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore]);
+
   const activeFilterCount =
     (tier !== "all" ? 1 : 0) +
     industries.size +
@@ -301,8 +318,9 @@ export function VirksomhederView({
                       setMaxDistance(parseInt(e.target.value, 10));
                       resetPaging();
                     }}
+                    style={{ "--range-pct": `${(((maxDistance ?? 300) - 5) / (500 - 5)) * 100}%` } as React.CSSProperties}
                   />
-                  <span className="distance-val">op til {maxDistance} km</span>
+                  <span className="distance-pill">+{maxDistance} km</span>
                 </div>
                 <div className="distance-note">Afstande er omtrentlige (by-niveau for virksomhedens hovedkontor), ikke præcise adresser.</div>
               </div>
@@ -348,10 +366,11 @@ export function VirksomhederView({
           ))
         )}
       </div>
-      {filtered.length > visible.length ? (
+      {hasMore ? (
         <div className="load-more-row">
+          <div ref={loadMoreRef} className="load-more-sentinel" />
           <button type="button" className="btn" onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}>
-            Indlæs flere ({filtered.length - visible.length} tilbage)
+            Indlæs flere
           </button>
         </div>
       ) : null}
