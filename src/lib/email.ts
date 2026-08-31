@@ -23,7 +23,7 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
   });
   if (error) {
     console.error("[email] send failed:", error);
-    return { sent: false as const, reason: "send_error" as const };
+    return { sent: false as const, reason: "send_error" as const, message: error.message };
   }
   return { sent: true as const };
 }

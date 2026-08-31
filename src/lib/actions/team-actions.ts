@@ -122,7 +122,10 @@ export async function inviteEmailAction(
   const result = await sendEmail({ to: parsed.data.email, subject, html, text });
 
   if (!result.sent) {
-    return { error: "Kunne ikke sende mailen — RESEND_API_KEY er ikke sat endnu (se README)." };
+    if (result.reason === "not_configured") {
+      return { error: "Kunne ikke sende mailen — RESEND_API_KEY er ikke sat endnu (se README)." };
+    }
+    return { error: `Kunne ikke sende mailen: ${result.message}` };
   }
   return { ok: true };
 }
