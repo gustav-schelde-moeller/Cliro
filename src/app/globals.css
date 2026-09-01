@@ -542,6 +542,14 @@ input,select{ font-family:inherit; }
 }
 .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 
+/* ===== update banner ===== */
+.update-banner{
+  position:fixed; bottom:20px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:14px;
+  background:var(--surface); border:1px solid var(--accent); color:var(--text); font-size:13px; padding:10px 12px 10px 18px;
+  border-radius:999px; box-shadow:var(--shadow); z-index:90;
+}
+.update-banner .btn{ padding:6px 14px; font-size:12.5px; }
+
 @media (max-width:920px){
   .app-active{ padding:0; }
   #appShell{ border-radius:0; grid-template-columns:76px 1fr; min-height:100vh; height:100vh; }
