@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { INDUSTRIES, haversineKm, type Company } from "@/lib/companies";
+import { haversineKm, type Company } from "@/lib/companies";
 import { LeadCard, type LeadState } from "./LeadCard";
 import { LeadDrawer } from "./LeadDrawer";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
@@ -15,9 +15,14 @@ const TIER_DEFS = [
   { key: "warm", label: "God mulighed" },
   { key: "cool", label: "Kan overvejes" },
 ] as const;
+const NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 type Tier = (typeof TIER_DEFS)[number]["key"];
-type SortKey = "score" | "recent" | "name" | "distance";
+type SortKey = "score" | "recent" | "added" | "name" | "distance";
+
+function isNewCompany(c: Company): boolean {
+  return Date.now() - new Date(c.createdAt).getTime() < NEW_WINDOW_MS;
+}
 
 export function VirksomhederView({
   companies,
@@ -44,6 +49,7 @@ export function VirksomhederView({
   const [named, setNamed] = useState(false);
   const [directEmail, setDirectEmail] = useState(false);
   const [starOnly, setStarOnly] = useState(false);
+  const [newOnly, setNewOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>("score");
   const [myLocation, setMyLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [maxDistance, setMaxDistance] = useState<number | null>(null);
@@ -55,6 +61,12 @@ export function VirksomhederView({
 
   const leadOf = (id: number): LeadState => leads[id] ?? { status: "new", assigneeId: null, assigneeName: null };
 
+  const INDUSTRIES = useMemo(
+    () => Array.from(new Set(companies.map((c) => c.industry))).sort((a, b) => a.localeCompare(b, "da")),
+    [companies]
+  );
+  const newCount = useMemo(() => companies.filter(isNewCompany).length, [companies]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     const list = companies.filter((c) => {
@@ -63,6 +75,7 @@ export function VirksomhederView({
       if (named && !c.contact.found) return false;
       if (directEmail && !c.contact.email) return false;
       if (starOnly && !starred.has(c.id)) return false;
+      if (newOnly && !isNewCompany(c)) return false;
       if (myLocation && maxDistance != null) {
         const d = haversineKm(myLocation.lat, myLocation.lng, c.lat, c.lng);
         if (d > maxDistance) return false;
@@ -76,6 +89,7 @@ export function VirksomhederView({
     const copy = list.slice();
     if (sort === "score") copy.sort((a, b) => b.score - a.score);
     else if (sort === "recent") copy.sort((a, b) => b.dateRank - a.dateRank);
+    else if (sort === "added") copy.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     else if (sort === "name") copy.sort((a, b) => a.name.localeCompare(b.name, "da"));
     else if (sort === "distance" && myLocation) {
       copy.sort(
@@ -84,7 +98,7 @@ export function VirksomhederView({
       );
     }
     return copy;
-  }, [companies, search, tier, industries, named, directEmail, starOnly, myLocation, maxDistance, sort, starred]);
+  }, [companies, search, tier, industries, named, directEmail, starOnly, newOnly, myLocation, maxDistance, sort, starred]);
 
   const visible = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visible.length;
@@ -110,6 +124,7 @@ export function VirksomhederView({
     (named ? 1 : 0) +
     (directEmail ? 1 : 0) +
     (starOnly ? 1 : 0) +
+    (newOnly ? 1 : 0) +
     (myLocation && maxDistance != null ? 1 : 0);
 
   function resetPaging() {
@@ -239,6 +254,7 @@ export function VirksomhederView({
         >
           <option value="score">Sortér: Score (høj → lav)</option>
           <option value="recent">Sortér: Nyeste vinkel</option>
+          <option value="added">Sortér: Nyeste tilføjet</option>
           <option value="name">Sortér: Navn (A–Å)</option>
           <option value="distance" disabled={!myLocation}>
             Sortér: Afstand (nærmest)
@@ -294,6 +310,9 @@ export function VirksomhederView({
               <button className={`chip${starOnly ? " star-active" : ""}`} onClick={() => { setStarOnly((v) => !v); resetPaging(); }}>
                 ★ Stjernemarkerede
               </button>
+              <button className={`chip${newOnly ? " active" : ""}`} onClick={() => { setNewOnly((v) => !v); resetPaging(); }}>
+                🆕 Nye (sidste 7 dage) ({newCount})
+              </button>
             </div>
           </div>
           <div className="filter-section">
@@ -336,6 +355,7 @@ export function VirksomhederView({
                 setNamed(false);
                 setDirectEmail(false);
                 setStarOnly(false);
+                setNewOnly(false);
                 setMaxDistance(null);
                 setSearch("");
                 resetPaging();
@@ -357,6 +377,7 @@ export function VirksomhederView({
               company={c}
               lead={leadOf(c.id)}
               starred={starred.has(c.id)}
+              isNew={isNewCompany(c)}
               distanceKm={myLocation ? haversineKm(myLocation.lat, myLocation.lng, c.lat, c.lng) : null}
               index={idx}
               onOpen={() => setSelectedId(c.id)}

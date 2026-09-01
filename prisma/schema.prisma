@@ -90,9 +90,34 @@ model TeamMember {
   @@unique([teamId, userId])
 }
 
+// The lead dataset shown on the Virksomheder page. Seeded once from the
+// original 47 hand-researched companies; new rows are appended daily by
+// /api/cron/daily-research (real web-search-grounded research, never
+// fabricated) and by nothing else — rows are never deleted or edited, so
+// createdAt doubles as a reliable "newest first" / "added this week" signal.
+model Company {
+  id        Int      @id @default(autoincrement())
+  name      String
+  website   String
+  industry  String
+  city      String
+  lat       Float
+  lng       Float
+  score     Int
+  breakdown Json // { contact, news, industry, creative }
+  dateRank  Int
+  tier      Json // { key: "hot" | "warm" | "cool", label }
+  hook      Json // { title, summary, date, url }
+  existing  String
+  social    String
+  idea      String
+  contact   Json // { found, name, title, email, note, sourceUrl?, profileUrl? }
+  mail      Json // { subject, body }
+  createdAt DateTime @default(now())
+}
+
 // One row per (team, company) that has actually been touched — matches the
-// original app's sparse "leads" map. companyId references the static
-// COMPANIES dataset in src/lib/companies.ts, not a database table.
+// original app's sparse "leads" map. companyId references Company.id.
 model Lead {
   id         String   @id @default(cuid())
   teamId     String

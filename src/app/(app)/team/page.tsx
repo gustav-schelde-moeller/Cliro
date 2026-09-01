@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getActiveTeamId } from "@/lib/session-team";
 import { getTeamWithRole, getTeamMembers, getTeamLeadsMap, getActivityLog } from "@/lib/queries";
-import { COMPANIES } from "@/lib/companies";
+import { getCompanies } from "@/lib/companies";
 import { TeamView } from "@/components/team/TeamView";
 
 export default async function TeamPage() {
@@ -14,7 +14,8 @@ export default async function TeamPage() {
   const ctx = await getTeamWithRole(teamId, session.user.id);
   if (!ctx) redirect("/team-gate");
 
-  const [members, leadsMap, activity] = await Promise.all([
+  const [COMPANIES, members, leadsMap, activity] = await Promise.all([
+    getCompanies(),
     getTeamMembers(teamId, ctx.team.ownerId),
     getTeamLeadsMap(teamId),
     getActivityLog(teamId, 60),

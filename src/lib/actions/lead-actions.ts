@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { companyById } from "@/lib/companies";
+import { getCompanyById } from "@/lib/companies";
 
 async function requireUser() {
   const session = await auth();
@@ -34,7 +34,7 @@ function revalidateTeamPages() {
 export async function setLeadStatusAction(teamId: string, companyId: number, status: string) {
   const user = await requireUser();
   await requireMembership(teamId, user.id);
-  const company = companyById(companyId);
+  const company = await getCompanyById(companyId);
   if (!company) throw new Error("Ukendt virksomhed.");
 
   await prisma.lead.upsert({
@@ -57,7 +57,7 @@ export async function setLeadStatusAction(teamId: string, companyId: number, sta
 export async function assignToMeAction(teamId: string, companyId: number) {
   const user = await requireUser();
   await requireMembership(teamId, user.id);
-  const company = companyById(companyId);
+  const company = await getCompanyById(companyId);
   if (!company) throw new Error("Ukendt virksomhed.");
 
   await prisma.lead.upsert({
@@ -80,7 +80,7 @@ export async function assignToMeAction(teamId: string, companyId: number) {
 export async function releaseAssignmentAction(teamId: string, companyId: number) {
   const user = await requireUser();
   await requireMembership(teamId, user.id);
-  const company = companyById(companyId);
+  const company = await getCompanyById(companyId);
   if (!company) throw new Error("Ukendt virksomhed.");
 
   await prisma.lead.upsert({

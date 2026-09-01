@@ -9,6 +9,7 @@ export function LeadCard({
   company,
   lead,
   starred,
+  isNew,
   distanceKm,
   index,
   onOpen,
@@ -18,6 +19,7 @@ export function LeadCard({
   company: Company;
   lead: LeadState;
   starred: boolean;
+  isNew?: boolean;
   distanceKm: number | null;
   index: number;
   onOpen: () => void;
@@ -59,6 +61,7 @@ export function LeadCard({
         <div className="card-title-row">
           <h3>{company.name}</h3>
           <span className="tag">{company.industry}</span>
+          {isNew ? <span className="new-badge">🆕 Ny</span> : null}
         </div>
         <div className="card-news">
           <b>{company.hook.title}</b> — {company.hook.summary}

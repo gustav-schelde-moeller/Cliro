@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getActiveTeamId } from "@/lib/session-team";
 import { getTeamLeadsMap, getUserStars } from "@/lib/queries";
-import { COMPANIES } from "@/lib/companies";
+import { getCompanies } from "@/lib/companies";
 import { VirksomhederView } from "@/components/leads/VirksomhederView";
 
 export default async function VirksomhederPage() {
@@ -12,7 +12,11 @@ export default async function VirksomhederPage() {
   const teamId = await getActiveTeamId(session.user.id);
   if (!teamId) redirect("/team-gate");
 
-  const [leadsMap, stars] = await Promise.all([getTeamLeadsMap(teamId), getUserStars(session.user.id)]);
+  const [COMPANIES, leadsMap, stars] = await Promise.all([
+    getCompanies(),
+    getTeamLeadsMap(teamId),
+    getUserStars(session.user.id),
+  ]);
 
   const leadsPlain = Object.fromEntries(leadsMap);
   const starsPlain = Array.from(stars);

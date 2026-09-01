@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getActiveTeamId } from "@/lib/session-team";
 import { getTeamLeadsMap, getActivityLog, getUserStars } from "@/lib/queries";
-import { COMPANIES } from "@/lib/companies";
+import { getCompanies } from "@/lib/companies";
 import { STATUS_DEFS } from "@/lib/status";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { DashboardInProgress } from "@/components/dashboard/DashboardInProgress";
@@ -24,7 +24,8 @@ export default async function DashboardPage() {
   const teamId = await getActiveTeamId(session.user.id);
   if (!teamId) redirect("/team-gate");
 
-  const [leadsMap, activity, starCount, userStars] = await Promise.all([
+  const [COMPANIES, leadsMap, activity, starCount, userStars] = await Promise.all([
+    getCompanies(),
     getTeamLeadsMap(teamId),
     getActivityLog(teamId, 20),
     prisma.star.count({ where: { userId: session.user.id } }),
