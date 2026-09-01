@@ -2,8 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import type { Tier } from "@/lib/companies";
 
-// Vercel Cron requests can run long (web search + reasoning) — allow up to 5 minutes.
-export const maxDuration = 300;
+// A same-day sweep across up to 20 companies with heavy web search genuinely
+// takes a while — the first live run was killed by the platform at 300s
+// while still working. Vercel Pro (fluid compute) allows up to 800s.
+export const maxDuration = 800;
 
 const TIER_LABELS: Record<Tier, string> = {
   hot: "Varm lead",
