@@ -280,7 +280,7 @@ async function run(request: Request): Promise<Response> {
         max_tokens: 20000,
         system: buildSystemPrompt(todayDa),
         thinking: { type: "adaptive" },
-        output_config: { effort: "high" },
+        output_config: { effort: "low" },
         tools,
         messages,
       });
