@@ -271,8 +271,11 @@ async function run(request: Request): Promise<Response> {
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: buildUserPrompt(existingNames, todayDa) }];
 
   let submitted: { companies: SubmittedCompany[] } | null = null;
+  let lastResponse: Anthropic.Message | null = null;
+  let iterations = 0;
 
   for (let i = 0; i < 30 && !submitted; i++) {
+    iterations++;
     let response: Anthropic.Message;
     try {
       const stream = client.messages.stream({
@@ -295,6 +298,8 @@ async function run(request: Request): Promise<Response> {
       throw error;
     }
 
+    lastResponse = response;
+
     if (response.stop_reason === "pause_turn") {
       messages.push({ role: "assistant", content: response.content });
       continue;
@@ -316,7 +321,21 @@ async function run(request: Request): Promise<Response> {
   }
 
   if (!submitted || submitted.companies.length === 0) {
-    return Response.json({ error: "Claude leverede ikke et struktureret resultat" }, { status: 502 });
+    const finalText = lastResponse?.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("\n") || null;
+    return Response.json(
+      {
+        error: "Claude leverede ikke et struktureret resultat",
+        diagnostics: {
+          iterations,
+          lastStopReason: lastResponse?.stop_reason ?? null,
+          finalText,
+        },
+      },
+      { status: 502 },
+    );
   }
 
   const inserted: string[] = [];
