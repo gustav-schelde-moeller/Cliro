@@ -223,6 +223,16 @@ function isValidTier(key: string): key is Tier {
 }
 
 export async function GET(request: Request) {
+  try {
+    return await run(request);
+  } catch (error) {
+    console.error("daily-research cron failed:", error);
+    const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    return Response.json({ error: `Uventet fejl: ${message}` }, { status: 500 });
+  }
+}
+
+async function run(request: Request): Promise<Response> {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -255,7 +265,7 @@ export async function GET(request: Request) {
   for (let i = 0; i < 30 && !submitted; i++) {
     let response: Anthropic.Message;
     try {
-      response = await client.messages.create({
+      const stream = client.messages.stream({
         model: "claude-sonnet-5",
         max_tokens: 64000,
         system: buildSystemPrompt(todayDa),
@@ -264,6 +274,7 @@ export async function GET(request: Request) {
         tools,
         messages,
       });
+      response = await stream.finalMessage();
     } catch (error) {
       if (error instanceof Anthropic.RateLimitError) {
         return Response.json({ error: "Rate limited by Anthropic" }, { status: 429 });
