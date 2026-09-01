@@ -21,8 +21,7 @@ const SUBMIT_COMPANIES_TOOL: Anthropic.Tool = {
     properties: {
       companies: {
         type: "array",
-        minItems: 1,
-        maxItems: 20,
+        description: "1 to 20 companies. Strict-mode custom tools don't support minItems/maxItems, so this is enforced by instruction only.",
         items: {
           type: "object",
           properties: {
@@ -73,12 +72,12 @@ const SUBMIT_COMPANIES_TOOL: Anthropic.Tool = {
               type: "object",
               properties: {
                 found: { type: "boolean" },
-                name: { type: ["string", "null"] },
-                title: { type: ["string", "null"] },
-                email: { type: ["string", "null"] },
-                note: { type: ["string", "null"] },
-                sourceUrl: { type: ["string", "null"] },
-                profileUrl: { type: ["string", "null"] },
+                name: { anyOf: [{ type: "string" }, { type: "null" }] },
+                title: { anyOf: [{ type: "string" }, { type: "null" }] },
+                email: { anyOf: [{ type: "string" }, { type: "null" }] },
+                note: { anyOf: [{ type: "string" }, { type: "null" }] },
+                sourceUrl: { anyOf: [{ type: "string" }, { type: "null" }] },
+                profileUrl: { anyOf: [{ type: "string" }, { type: "null" }] },
               },
               required: ["found", "name", "title", "email", "note", "sourceUrl", "profileUrl"],
               additionalProperties: false,
@@ -305,14 +304,14 @@ async function run(request: Request): Promise<Response> {
     break;
   }
 
-  if (!submitted) {
+  if (!submitted || submitted.companies.length === 0) {
     return Response.json({ error: "Claude leverede ikke et struktureret resultat" }, { status: 502 });
   }
 
   const inserted: string[] = [];
   const skipped: string[] = [];
 
-  for (const c of submitted.companies) {
+  for (const c of submitted.companies.slice(0, 20)) {
     const key = c.name.trim().toLowerCase();
     if (seenNames.has(key) || !isValidTier(c.tier.key)) {
       skipped.push(c.name);
