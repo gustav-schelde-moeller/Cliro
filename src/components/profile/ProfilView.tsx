@@ -6,7 +6,6 @@ import { Avatar } from "@/components/shared/Avatar";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
 import { updateNameAction, updateAvatarAction } from "@/lib/actions/profile-actions";
 import { logoutAction } from "@/lib/actions/auth-actions";
-import { leaveTeamAction, deleteTeamAction } from "@/lib/actions/team-actions";
 
 function resizeImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -34,75 +33,16 @@ function resizeImage(file: File): Promise<string> {
   });
 }
 
-function TeamDangerZone({ teamId, teamName, isOwner }: { teamId: string; teamName: string; isOwner: boolean }) {
-  const { showToast } = useToast();
-  const [confirming, setConfirming] = useState(false);
-  const [pending, startTransition] = useTransition();
-
-  function handleLeave() {
-    startTransition(async () => {
-      try {
-        await leaveTeamAction(teamId);
-      } catch (err) {
-        showToast(errorMessage(err, "Kunne ikke forlade teamet."));
-      }
-    });
-  }
-
-  function handleDelete() {
-    startTransition(async () => {
-      try {
-        await deleteTeamAction(teamId);
-      } catch (err) {
-        showToast(errorMessage(err, "Kunne ikke slette teamet."));
-      }
-    });
-  }
-
-  return (
-    <div className="panel-card danger-zone" style={{ maxWidth: 520 }}>
-      <div className="profil-row">
-        <div>
-          <div className="label">{isOwner ? "Slet team" : "Forlad team"}</div>
-          <div className="desc">
-            {isOwner
-              ? `Sletter "${teamName}" permanent for alle medlemmer, inklusiv al aktivitet og alle tildelinger.`
-              : `Du forlader "${teamName}". Dine egne tildelinger frigives til teamet.`}
-          </div>
-        </div>
-        {confirming ? (
-          <div className="delete-confirm-row">
-            <button type="button" className="btn" disabled={pending} onClick={() => setConfirming(false)}>
-              Fortryd
-            </button>
-            <button type="button" className="btn danger" disabled={pending} onClick={isOwner ? handleDelete : handleLeave}>
-              {pending ? "Arbejder…" : isOwner ? "Ja, slet teamet" : "Ja, forlad teamet"}
-            </button>
-          </div>
-        ) : (
-          <button type="button" className="btn danger" onClick={() => setConfirming(true)}>
-            {isOwner ? "Slet team" : "Forlad team"}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function ProfilView({
   name,
   email,
   avatarDataUrl,
-  teamId,
   teamName,
-  isOwner,
 }: {
   name: string;
   email: string;
   avatarDataUrl: string | null;
-  teamId: string;
   teamName: string;
-  isOwner: boolean;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -202,8 +142,6 @@ export function ProfilView({
           </button>
         </div>
       </div>
-
-      <TeamDangerZone teamId={teamId} teamName={teamName} isOwner={isOwner} />
     </section>
   );
 }

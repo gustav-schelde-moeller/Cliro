@@ -5,11 +5,13 @@ import { Modal } from "@/components/shared/Modal";
 import { ThemeSegmented } from "@/components/profile/ThemeSegmented";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
 import { changePasswordAction, deleteAccountAction } from "@/lib/actions/profile-actions";
+import { leaveTeamAction, deleteTeamAction } from "@/lib/actions/team-actions";
 
-type Section = "konto" | "udseende";
+type Section = "konto" | "team" | "udseende";
 
 const SECTIONS: { key: Section; label: string; desc: string }[] = [
   { key: "konto", label: "Konto", desc: "Adgangskode og slet konto" },
+  { key: "team", label: "Team", desc: "Forlad eller slet dit nuværende team" },
   { key: "udseende", label: "Udseende", desc: "Lyst, mørkt eller system" },
 ];
 
@@ -119,6 +121,62 @@ function KontoSection({ hasPassword }: { hasPassword: boolean }) {
   );
 }
 
+function TeamSection({ teamId, teamName, isOwner }: { teamId: string; teamName: string; isOwner: boolean }) {
+  const { showToast } = useToast();
+  const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function handleLeave() {
+    startTransition(async () => {
+      try {
+        await leaveTeamAction(teamId);
+      } catch (err) {
+        showToast(errorMessage(err, "Kunne ikke forlade teamet."));
+      }
+    });
+  }
+
+  function handleDelete() {
+    startTransition(async () => {
+      try {
+        await deleteTeamAction(teamId);
+      } catch (err) {
+        showToast(errorMessage(err, "Kunne ikke slette teamet."));
+      }
+    });
+  }
+
+  return (
+    <div className="panel-card danger-zone" style={{ maxWidth: 480 }}>
+      <h3>Team</h3>
+      <div className="profil-row" style={{ borderBottom: "none" }}>
+        <div>
+          <div className="label">{isOwner ? "Slet team" : "Forlad team"}</div>
+          <div className="desc">
+            {isOwner
+              ? `Sletter "${teamName}" permanent for alle medlemmer, inklusiv al aktivitet og alle tildelinger.`
+              : `Du forlader "${teamName}". Dine egne tildelinger frigives til teamet.`}
+          </div>
+        </div>
+        {confirming ? (
+          <div className="delete-confirm-row">
+            <button type="button" className="btn" disabled={pending} onClick={() => setConfirming(false)}>
+              Fortryd
+            </button>
+            <button type="button" className="btn danger" disabled={pending} onClick={isOwner ? handleDelete : handleLeave}>
+              {pending ? "Arbejder…" : isOwner ? "Ja, slet teamet" : "Ja, forlad teamet"}
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="btn danger" onClick={() => setConfirming(true)}>
+            {isOwner ? "Slet team" : "Forlad team"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function UdseendeSection() {
   return (
     <div className="panel-card" style={{ maxWidth: 480 }}>
@@ -134,7 +192,17 @@ function UdseendeSection() {
   );
 }
 
-export function IndstillingerView({ hasPassword }: { hasPassword: boolean }) {
+export function IndstillingerView({
+  hasPassword,
+  teamId,
+  teamName,
+  isOwner,
+}: {
+  hasPassword: boolean;
+  teamId: string;
+  teamName: string;
+  isOwner: boolean;
+}) {
   const [section, setSection] = useState<Section>("konto");
 
   return (
@@ -154,6 +222,7 @@ export function IndstillingerView({ hasPassword }: { hasPassword: boolean }) {
       </nav>
       <div className="settings-content">
         {section === "konto" ? <KontoSection hasPassword={hasPassword} /> : null}
+        {section === "team" ? <TeamSection teamId={teamId} teamName={teamName} isOwner={isOwner} /> : null}
         {section === "udseende" ? <UdseendeSection /> : null}
       </div>
     </section>
