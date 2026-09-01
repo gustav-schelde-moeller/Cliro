@@ -11,11 +11,12 @@ import type { Tier } from "@/lib/companies";
 export const maxDuration = 300;
 
 // Per-invocation target. Keep this low enough that a same-day research
-// sweep reliably finishes within maxDuration — a 20-company sweep in one
-// call was killed by the platform timeout mid-work.
+// sweep reliably finishes within maxDuration — 20 timed out, then 5 timed
+// out again even at output_config.effort "low" (a same-day sweep is
+// inherently variable in duration, and 300s is a hard platform ceiling).
 // .github/workflows/daily-research.yml schedules multiple runs per weekday
-// so the daily total still reaches a similar volume.
-const PER_RUN_TARGET = 5;
+// so the daily total still reaches a reasonable volume.
+const PER_RUN_TARGET = 3;
 
 const TIER_LABELS: Record<Tier, string> = {
   hot: "Varm lead",
@@ -265,7 +266,7 @@ async function run(request: Request): Promise<Response> {
 
   const client = new Anthropic();
   const tools: Anthropic.Messages.ToolUnion[] = [
-    { type: "web_search_20260209", name: "web_search", max_uses: 40 },
+    { type: "web_search_20260209", name: "web_search", max_uses: 15 },
     SUBMIT_COMPANIES_TOOL,
   ];
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: buildUserPrompt(existingNames, todayDa) }];
@@ -280,10 +281,9 @@ async function run(request: Request): Promise<Response> {
     try {
       const stream = client.messages.stream({
         model: "claude-sonnet-5",
-        max_tokens: 20000,
+        max_tokens: 12000,
         system: buildSystemPrompt(todayDa),
-        thinking: { type: "adaptive" },
-        output_config: { effort: "low" },
+        thinking: { type: "disabled" },
         tools,
         messages,
       });
