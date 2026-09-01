@@ -15,13 +15,18 @@ const TIER_DEFS = [
   { key: "warm", label: "God mulighed" },
   { key: "cool", label: "Kan overvejes" },
 ] as const;
-const NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const TODAY_FORMATTER = new Intl.DateTimeFormat("da-DK", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "Europe/Copenhagen",
+});
 
 type Tier = (typeof TIER_DEFS)[number]["key"];
 type SortKey = "score" | "recent" | "added" | "name" | "distance";
 
-function isNewCompany(c: Company): boolean {
-  return Date.now() - new Date(c.createdAt).getTime() < NEW_WINDOW_MS;
+function isNewCompany(c: Company, todayDa: string): boolean {
+  return c.hook.date === todayDa;
 }
 
 export function VirksomhederView({
@@ -61,11 +66,13 @@ export function VirksomhederView({
 
   const leadOf = (id: number): LeadState => leads[id] ?? { status: "new", assigneeId: null, assigneeName: null };
 
+  const todayDa = TODAY_FORMATTER.format(new Date());
+
   const INDUSTRIES = useMemo(
     () => Array.from(new Set(companies.map((c) => c.industry))).sort((a, b) => a.localeCompare(b, "da")),
     [companies]
   );
-  const newCount = useMemo(() => companies.filter(isNewCompany).length, [companies]);
+  const newCount = useMemo(() => companies.filter((c) => isNewCompany(c, todayDa)).length, [companies, todayDa]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -75,7 +82,7 @@ export function VirksomhederView({
       if (named && !c.contact.found) return false;
       if (directEmail && !c.contact.email) return false;
       if (starOnly && !starred.has(c.id)) return false;
-      if (newOnly && !isNewCompany(c)) return false;
+      if (newOnly && !isNewCompany(c, todayDa)) return false;
       if (myLocation && maxDistance != null) {
         const d = haversineKm(myLocation.lat, myLocation.lng, c.lat, c.lng);
         if (d > maxDistance) return false;
@@ -98,7 +105,7 @@ export function VirksomhederView({
       );
     }
     return copy;
-  }, [companies, search, tier, industries, named, directEmail, starOnly, newOnly, myLocation, maxDistance, sort, starred]);
+  }, [companies, search, tier, industries, named, directEmail, starOnly, newOnly, todayDa, myLocation, maxDistance, sort, starred]);
 
   const visible = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visible.length;
@@ -311,7 +318,7 @@ export function VirksomhederView({
                 ★ Stjernemarkerede
               </button>
               <button className={`chip${newOnly ? " active" : ""}`} onClick={() => { setNewOnly((v) => !v); resetPaging(); }}>
-                🆕 Nye (sidste 7 dage) ({newCount})
+                Nye i dag ({newCount})
               </button>
             </div>
           </div>
@@ -377,7 +384,7 @@ export function VirksomhederView({
               company={c}
               lead={leadOf(c.id)}
               starred={starred.has(c.id)}
-              isNew={isNewCompany(c)}
+              isNew={isNewCompany(c, todayDa)}
               distanceKm={myLocation ? haversineKm(myLocation.lat, myLocation.lng, c.lat, c.lng) : null}
               index={idx}
               onOpen={() => setSelectedId(c.id)}

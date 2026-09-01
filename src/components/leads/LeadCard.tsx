@@ -61,7 +61,7 @@ export function LeadCard({
         <div className="card-title-row">
           <h3>{company.name}</h3>
           <span className="tag">{company.industry}</span>
-          {isNew ? <span className="new-badge">🆕 Ny</span> : null}
+          {isNew ? <span className="new-badge">Ny</span> : null}
         </div>
         <div className="card-news">
           <b>{company.hook.title}</b> — {company.hook.summary}

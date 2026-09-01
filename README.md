@@ -97,18 +97,18 @@ Uden dette virker email/password-login stadig 100%. "Fortsæt med Google"-knappe
 
 ## 5. Daglig research (Anthropic API, valgfrit)
 
-Uden dette virker appen 100% fint — virksomhedslisten vokser bare ikke af sig selv. Med det sat op, søger en cron-job hver morgen på nettet efter 1-3 nye danske virksomheder med en ægte, dagsaktuel nyhed, og tilføjer dem til listen (eksisterende virksomheder bliver aldrig rettet eller slettet).
+Uden dette virker appen 100% fint — virksomhedslisten vokser bare ikke af sig selv. Med det sat op, søger et cron-job hver hverdagsmorgen på nettet efter op til 20 nye danske virksomheder med en ægte nyhed offentliggjort samme dag, og tilføjer dem til listen (eksisterende virksomheder bliver aldrig rettet eller slettet). Kører ikke i weekenden. Bruger Claude Sonnet — koster groft anslået 50-110 kr/dag ved fuld volumen, typisk mindre på stille nyhedsdage.
 
-1. Gå til [console.anthropic.com](https://console.anthropic.com), opret en API-nøgle, og læg penge på kontoen (research af et par virksomheder om dagen koster typisk nogle få kroner).
+1. Gå til [console.anthropic.com](https://console.anthropic.com), opret en API-nøgle, og læg penge på kontoen.
 2. Sæt nøglen som `ANTHROPIC_API_KEY` i Vercels environment variables.
 3. Generér en tilfældig hemmelighed til at bekræfte at cron-kald rent faktisk kommer fra Vercel:
    ```bash
    openssl rand -base64 32
    ```
    Sæt værdien som `CRON_SECRET` i Vercels environment variables.
-4. Redeploy. `vercel.json` er allerede sat op til at kalde `/api/cron/daily-research` hver dag kl. 06:00 UTC — Vercel sender automatisk `CRON_SECRET` med som `Authorization`-header, så I behøver ikke gøre mere.
+4. Redeploy. `vercel.json` er allerede sat op til at kalde `/api/cron/daily-research` hver hverdag kl. 06:00 UTC — Vercel sender automatisk `CRON_SECRET` med som `Authorization`-header, så I behøver ikke gøre mere.
 
-I "Virksomheder"-visningen kan man sortere efter "Nyeste tilføjet" og filtrere til kun "Nye (sidste 7 dage)" for hurtigt at se, hvad der er kommet ind.
+I "Virksomheder"-visningen kan man sortere efter "Nyeste tilføjet" og filtrere til "Nye i dag" for hurtigt at se, hvad der er kommet ind — kortet på hver virksomhed viser også et "Ny"-mærke, når nyheden er fra i dag.
 
 ---
 

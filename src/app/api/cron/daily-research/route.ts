@@ -14,7 +14,7 @@ const TIER_LABELS: Record<Tier, string> = {
 const SUBMIT_COMPANIES_TOOL: Anthropic.Tool = {
   name: "submit_companies",
   description:
-    "Submit the final list of newly researched companies. Call this once, after you are done searching, with 1-3 companies that are not already in the existing-companies list.",
+    "Submit the final list of newly researched companies. Call this once, after you are done searching, with up to 20 companies that are not already in the existing-companies list. It is fine — expected, even — to submit fewer than 20 if that's all the real same-day news supports.",
   strict: true,
   input_schema: {
     type: "object",
@@ -22,7 +22,7 @@ const SUBMIT_COMPANIES_TOOL: Anthropic.Tool = {
       companies: {
         type: "array",
         minItems: 1,
-        maxItems: 3,
+        maxItems: 20,
         items: {
           type: "object",
           properties: {
@@ -120,17 +120,19 @@ const SUBMIT_COMPANIES_TOOL: Anthropic.Tool = {
   },
 };
 
-const SYSTEM_PROMPT = `Du research danske virksomheder til DAVAI, et dansk produktionsselskab der laver reklamefilm og musikvideoer og bruger nyheder som anledning til at kontakte virksomheder.
+function buildSystemPrompt(todayDa: string): string {
+  return `Du research danske virksomheder til DAVAI, et dansk produktionsselskab der laver reklamefilm og musikvideoer og bruger nyheder som anledning til at cold-calle virksomheder.
 
-Din opgave: find 1-3 danske virksomheder med en ÆGTE, veldokumenteret nyhedshistorie fra de seneste ca. 14 dage (produktlancering, rekord, kampagne, ledelsesskifte, investering, prisvinding e.l.), og saml research om dem, som sælgere hos DAVAI kan bruge til at tage kontakt.
+Din opgave: find op til 20 danske virksomheder med en ÆGTE, veldokumenteret nyhedshistorie offentliggjort i dag, ${todayDa} — IKKE en ældre nyhed, uanset hvor god den er — og saml research om dem, som sælgere hos DAVAI kan bruge til at ringe op.
 
-Brug web_search grundigt. Alt skal være ægte og efterprøveligt — find den faktiske nyhed med en rigtig kilde-URL, og forsøg at finde en navngiven, relevant kontaktperson (marketing/PR/kommunikation/CEO) med en kilde-URL eller LinkedIn-profil. Opfind ALDRIG navne, mailadresser eller nyheder. Hvis du ikke kan finde en navngiven kontakt, sæt contact.found=false og de øvrige contact-felter til null — gæt aldrig.
+Brug web_search grundigt. Alt skal være ægte og efterprøveligt — find den faktiske nyhed med en rigtig kilde-URL og tjek at publiceringsdatoen på kilden faktisk er ${todayDa}, og forsøg at finde en navngiven, relevant kontaktperson (marketing/PR/kommunikation/CEO) med en kilde-URL eller LinkedIn-profil. Opfind ALDRIG navne, mailadresser eller nyheder. Hvis du ikke kan finde en navngiven kontakt, sæt contact.found=false og de øvrige contact-felter til null — gæt aldrig.
 
 Kriterier for de virksomheder du vælger:
 - Skal være et rigtigt dansk selskab (eller et internationalt selskab med markant dansk tilstedeværelse).
 - Må IKKE allerede findes i listen over eksisterende virksomheder, du får i brugerbeskeden — tjek navnet grundigt (stavevarianter, danske vs. engelske navne osv.).
-- Skal have en konkret, dagsaktuel nyhedskrog — ikke generel virksomhedsinfo.
+- Nyheden SKAL være fra i dag, ${todayDa} — ikke i går, ikke sidste uge. Generel virksomhedsinfo eller ældre nyheder tæller ikke, uanset hvor relevante de ellers er.
 - Bland gerne brancher og virksomhedsstørrelser over tid; undgå at researche samme branche som sidst, hvis du kan se mønstre i den eksisterende liste.
+- Det er helt fint — og forventet på en stille nyhedsdag — at levere færre end 20. Fyld ALDRIG listen op med gårsdagens eller ældre nyheder for at nå et bestemt antal.
 
 Scoring (breakdown, summer til score):
 - contact (0-30): højere jo mere direkte/relevant kontaktperson du fandt (navngivet + direkte mail = højt).
@@ -141,7 +143,7 @@ dateRank er YYYYMM for hook.date. tier.key er "hot" for score ≥85, "warm" for 
 
 Tone i "mail"-feltet: kort, uformel, konkret — nævn nyheden, præsentér DAVAI i én sætning, foreslå en konkret idé, og bed om en uforpligtende snak. Skriv i du-form. Signér "[dit navn], DAVAI".
 
-Eksempel på et fuldt, korrekt udfyldt element (brug dette som stilistisk skabelon, kopiér ikke indholdet):
+Eksempel på et fuldt, korrekt udfyldt element (brug dette KUN som stilistisk skabelon for felterne — kopiér ikke indholdet, og bemærk at eksemplets dato ikke er dagens dato):
 {
   "name": "Sunset Boulevard",
   "website": "sunset-boulevard.dk",
@@ -176,14 +178,17 @@ Eksempel på et fuldt, korrekt udfyldt element (brug dette som stilistisk skabel
   }
 }
 
-Når du er færdig med at søge og har 1-3 solide, ægte kandidater, kald submit_companies med dem. Kald den kun én gang, som dit sidste skridt.`;
+Når du er færdig med at søge og har fundet så mange solide, ægte kandidater med nyheder fra i dag som findes (op til 20), kald submit_companies med dem. Kald den kun én gang, som dit sidste skridt.`;
+}
 
-function buildUserPrompt(existingNames: string[]): string {
+function buildUserPrompt(existingNames: string[], todayDa: string): string {
   return [
+    `Dagens dato er ${todayDa}.`,
+    "",
     "Eksisterende virksomheder i databasen (find IKKE disse igen, søg efter helt nye):",
     existingNames.join(", "),
     "",
-    "Find 1-3 nye danske virksomheder med en ægte, dagsaktuel nyhedshistorie fra de seneste ca. 14 dage, og lever fuld research på dem via submit_companies.",
+    `Find op til 20 nye danske virksomheder med en ægte nyhedshistorie offentliggjort i dag, ${todayDa} — ikke ældre nyheder — og lever fuld research på dem via submit_companies. Lever hellere færre end 20, hvis der ikke er nok ægte nyheder fra præcis i dag.`,
   ].join("\n");
 }
 
@@ -227,26 +232,33 @@ export async function GET(request: Request) {
     return Response.json({ error: "ANTHROPIC_API_KEY er ikke sat" }, { status: 500 });
   }
 
+  const todayDa = new Intl.DateTimeFormat("da-DK", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Copenhagen",
+  }).format(new Date());
+
   const existing = await prisma.company.findMany({ select: { name: true } });
   const existingNames = existing.map((c) => c.name);
   const seenNames = new Set(existingNames.map((n) => n.trim().toLowerCase()));
 
   const client = new Anthropic();
   const tools: Anthropic.Messages.ToolUnion[] = [
-    { type: "web_search_20260209", name: "web_search", max_uses: 20 },
+    { type: "web_search_20260209", name: "web_search", max_uses: 150 },
     SUBMIT_COMPANIES_TOOL,
   ];
-  const messages: Anthropic.MessageParam[] = [{ role: "user", content: buildUserPrompt(existingNames) }];
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: buildUserPrompt(existingNames, todayDa) }];
 
   let submitted: { companies: SubmittedCompany[] } | null = null;
 
-  for (let i = 0; i < 12 && !submitted; i++) {
+  for (let i = 0; i < 30 && !submitted; i++) {
     let response: Anthropic.Message;
     try {
       response = await client.messages.create({
-        model: "claude-opus-5",
-        max_tokens: 16000,
-        system: SYSTEM_PROMPT,
+        model: "claude-sonnet-5",
+        max_tokens: 64000,
+        system: buildSystemPrompt(todayDa),
         thinking: { type: "adaptive" },
         output_config: { effort: "high" },
         tools,
