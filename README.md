@@ -97,16 +97,19 @@ Uden dette virker email/password-login stadig 100%. "Fortsæt med Google"-knappe
 
 ## 5. Daglig research (Anthropic API, valgfrit)
 
-Uden dette virker appen 100% fint — virksomhedslisten vokser bare ikke af sig selv. Med det sat op, søger et cron-job på nettet efter op til 5 nye danske virksomheder med en ægte nyhed offentliggjort samme dag ad gangen, og tilføjer dem til listen (eksisterende virksomheder bliver aldrig rettet eller slettet). Det kører 4 gange hver hverdag (kl. 06, 08, 10 og 12 UTC) — opdelt i flere mindre kørsler, fordi Vercels gratis Hobby-plan sætter en hård grænse på 300 sekunder pr. kørsel, og en fuld same-day-søgning på ret mange virksomheder på én gang ikke kan nå at blive færdig inden for det. Samlet giver det stadig op til ca. 20/dag. Kører ikke i weekenden. Bruger Claude Sonnet — koster groft anslået 50-110 kr/dag ved fuld volumen, typisk mindre på stille nyhedsdage.
+Uden dette virker appen 100% fint — virksomhedslisten vokser bare ikke af sig selv. Med det sat op, søger et automatisk job på nettet efter op til 5 nye danske virksomheder med en ægte nyhed offentliggjort samme dag ad gangen, og tilføjer dem til listen (eksisterende virksomheder bliver aldrig rettet eller slettet). Det kører 4 gange hver hverdag (kl. 06, 08, 10 og 12 UTC) — opdelt i flere mindre kørsler, fordi Vercels gratis Hobby-plan sætter en hård grænse på 300 sekunder pr. kørsel, og en fuld same-day-søgning på ret mange virksomheder på én gang ikke kan nå at blive færdig inden for det. Samlet giver det stadig op til ca. 20/dag. Kører ikke i weekenden. Bruger Claude Sonnet — koster groft anslået 50-110 kr/dag ved fuld volumen, typisk mindre på stille nyhedsdage.
+
+Selve tidsstyringen sker via en **GitHub Actions-workflow** ([.github/workflows/daily-research.yml](.github/workflows/daily-research.yml)) i stedet for Vercels indbyggede Cron Jobs — Vercels gratis plan afviste et cron-skema med mere end én kørsel om dagen, mens GitHub Actions ikke har den begrænsning.
 
 1. Gå til [console.anthropic.com](https://console.anthropic.com), opret en API-nøgle under et konkret Workspace (ikke en personligt bundet nøgle), og læg penge på kontoen.
-2. Sæt nøglen som `ANTHROPIC_API_KEY` i Vercels environment variables.
-3. Generér en tilfældig hemmelighed til at bekræfte at cron-kald rent faktisk kommer fra Vercel:
+2. Sæt nøglen som `ANTHROPIC_API_KEY` i Vercels environment variables, og redeploy.
+3. Generér en tilfældig hemmelighed:
    ```bash
    openssl rand -base64 32
    ```
-   Sæt værdien som `CRON_SECRET` i Vercels environment variables.
-4. Redeploy. `vercel.json` er allerede sat op til at kalde `/api/cron/daily-research` 4 gange om dagen på hverdage — Vercel sender automatisk `CRON_SECRET` med som `Authorization`-header, så I behøver ikke gøre mere.
+   Sæt værdien som `CRON_SECRET` i Vercels environment variables (redeploy igen).
+4. Tilføj **samme** værdi som en **GitHub Actions secret** i repoet: **Settings → Secrets and variables → Actions → New repository secret**, navngiv den `CRON_SECRET`, og indsæt værdien.
+5. Det var det — workflow'en kører automatisk efter sin tidsplan. Den kan også køres manuelt til test via **Actions**-fanen → **Daily company research** → **Run workflow**.
 
 I "Virksomheder"-visningen kan man sortere efter "Nyeste tilføjet" og filtrere til "Nye i dag" for hurtigt at se, hvad der er kommet ind — kortet på hver virksomhed viser også et "Ny"-mærke, når nyheden er fra i dag.
 

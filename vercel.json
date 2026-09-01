@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/daily-research",
-      "schedule": "0 6,8,10,12 * * 1-5"
-    }
-  ]
-}

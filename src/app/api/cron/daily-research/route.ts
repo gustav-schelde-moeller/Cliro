@@ -6,14 +6,15 @@ import type { Tier } from "@/lib/companies";
 // failed deploy at 800s ("Serverless Functions must have a maxDuration
 // between 1 and 300 for plan hobby"). Since a single run can't be made
 // longer, the daily target is instead split across several smaller runs
-// per day (see vercel.json) that each comfortably finish within this cap.
+// per day (see .github/workflows/daily-research.yml) that each comfortably
+// finish within this cap.
 export const maxDuration = 300;
 
 // Per-invocation target. Keep this low enough that a same-day research
 // sweep reliably finishes within maxDuration — a 20-company sweep in one
-// call was killed by the platform timeout mid-work. vercel.json schedules
-// multiple runs per weekday so the daily total still reaches a similar
-// volume.
+// call was killed by the platform timeout mid-work.
+// .github/workflows/daily-research.yml schedules multiple runs per weekday
+// so the daily total still reaches a similar volume.
 const PER_RUN_TARGET = 5;
 
 const TIER_LABELS: Record<Tier, string> = {
