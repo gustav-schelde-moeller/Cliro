@@ -95,6 +95,23 @@ Uden dette virker email/password-login stadig 100%. "Fortsæt med Google"-knappe
 
 ---
 
+## 5. Daglig research (Anthropic API, valgfrit)
+
+Uden dette virker appen 100% fint — virksomhedslisten vokser bare ikke af sig selv. Med det sat op, søger en cron-job hver morgen på nettet efter 1-3 nye danske virksomheder med en ægte, dagsaktuel nyhed, og tilføjer dem til listen (eksisterende virksomheder bliver aldrig rettet eller slettet).
+
+1. Gå til [console.anthropic.com](https://console.anthropic.com), opret en API-nøgle, og læg penge på kontoen (research af et par virksomheder om dagen koster typisk nogle få kroner).
+2. Sæt nøglen som `ANTHROPIC_API_KEY` i Vercels environment variables.
+3. Generér en tilfældig hemmelighed til at bekræfte at cron-kald rent faktisk kommer fra Vercel:
+   ```bash
+   openssl rand -base64 32
+   ```
+   Sæt værdien som `CRON_SECRET` i Vercels environment variables.
+4. Redeploy. `vercel.json` er allerede sat op til at kalde `/api/cron/daily-research` hver dag kl. 06:00 UTC — Vercel sender automatisk `CRON_SECRET` med som `Authorization`-header, så I behøver ikke gøre mere.
+
+I "Virksomheder"-visningen kan man sortere efter "Nyeste tilføjet" og filtrere til kun "Nye (sidste 7 dage)" for hurtigt at se, hvad der er kommet ind.
+
+---
+
 ## Lokal udvikling
 
 ```bash
@@ -112,3 +129,4 @@ Kræver en `DATABASE_URL` i `.env` der peger på en rigtig Postgres-database (sa
 - **Auth.js v5** (email/password via bcrypt + valgfri Google OAuth), JWT-sessions
 - **Resend** til transaktionel email, med indbygget graceful fallback når den ikke er sat op
 - Alle sider under `(app)/` er server-renderet og tjekker rigtig database-adgang ved hvert kald — fjernes et medlem fra et team, mister de adgangen med det samme, uanset hvad der står i deres cookie
+- Virksomheder ligger i en rigtig `Company`-tabel (ikke en statisk fil), så `/api/cron/daily-research` kan tilføje nye rækker hver dag uden at redeploye
