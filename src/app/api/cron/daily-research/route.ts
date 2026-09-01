@@ -2,10 +2,19 @@ import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import type { Tier } from "@/lib/companies";
 
-// A same-day sweep across up to 20 companies with heavy web search genuinely
-// takes a while — the first live run was killed by the platform at 300s
-// while still working. Vercel Pro (fluid compute) allows up to 800s.
-export const maxDuration = 800;
+// Vercel Hobby caps Serverless Function duration at 300s — confirmed by a
+// failed deploy at 800s ("Serverless Functions must have a maxDuration
+// between 1 and 300 for plan hobby"). Since a single run can't be made
+// longer, the daily target is instead split across several smaller runs
+// per day (see vercel.json) that each comfortably finish within this cap.
+export const maxDuration = 300;
+
+// Per-invocation target. Keep this low enough that a same-day research
+// sweep reliably finishes within maxDuration — a 20-company sweep in one
+// call was killed by the platform timeout mid-work. vercel.json schedules
+// multiple runs per weekday so the daily total still reaches a similar
+// volume.
+const PER_RUN_TARGET = 5;
 
 const TIER_LABELS: Record<Tier, string> = {
   hot: "Varm lead",
@@ -15,15 +24,14 @@ const TIER_LABELS: Record<Tier, string> = {
 
 const SUBMIT_COMPANIES_TOOL: Anthropic.Tool = {
   name: "submit_companies",
-  description:
-    "Submit the final list of newly researched companies. Call this once, after you are done searching, with up to 20 companies that are not already in the existing-companies list. It is fine — expected, even — to submit fewer than 20 if that's all the real same-day news supports.",
+  description: `Submit the final list of newly researched companies. Call this once, after you are done searching, with up to ${PER_RUN_TARGET} companies that are not already in the existing-companies list. It is fine — expected, even — to submit fewer than ${PER_RUN_TARGET} if that's all the real same-day news supports.`,
   strict: true,
   input_schema: {
     type: "object",
     properties: {
       companies: {
         type: "array",
-        description: "1 to 20 companies. Strict-mode custom tools don't support minItems/maxItems, so this is enforced by instruction only.",
+        description: `1 to ${PER_RUN_TARGET} companies. Strict-mode custom tools don't support minItems/maxItems, so this is enforced by instruction only.`,
         items: {
           type: "object",
           properties: {
@@ -124,7 +132,7 @@ const SUBMIT_COMPANIES_TOOL: Anthropic.Tool = {
 function buildSystemPrompt(todayDa: string): string {
   return `Du research danske virksomheder til DAVAI, et dansk produktionsselskab der laver reklamefilm og musikvideoer og bruger nyheder som anledning til at cold-calle virksomheder.
 
-Din opgave: find op til 20 danske virksomheder med en ÆGTE, veldokumenteret nyhedshistorie offentliggjort i dag, ${todayDa} — IKKE en ældre nyhed, uanset hvor god den er — og saml research om dem, som sælgere hos DAVAI kan bruge til at ringe op.
+Din opgave: find op til ${PER_RUN_TARGET} danske virksomheder med en ÆGTE, veldokumenteret nyhedshistorie offentliggjort i dag, ${todayDa} — IKKE en ældre nyhed, uanset hvor god den er — og saml research om dem, som sælgere hos DAVAI kan bruge til at ringe op.
 
 Brug web_search grundigt. Alt skal være ægte og efterprøveligt — find den faktiske nyhed med en rigtig kilde-URL og tjek at publiceringsdatoen på kilden faktisk er ${todayDa}, og forsøg at finde en navngiven, relevant kontaktperson (marketing/PR/kommunikation/CEO) med en kilde-URL eller LinkedIn-profil. Opfind ALDRIG navne, mailadresser eller nyheder. Hvis du ikke kan finde en navngiven kontakt, sæt contact.found=false og de øvrige contact-felter til null — gæt aldrig.
 
@@ -133,7 +141,7 @@ Kriterier for de virksomheder du vælger:
 - Må IKKE allerede findes i listen over eksisterende virksomheder, du får i brugerbeskeden — tjek navnet grundigt (stavevarianter, danske vs. engelske navne osv.).
 - Nyheden SKAL være fra i dag, ${todayDa} — ikke i går, ikke sidste uge. Generel virksomhedsinfo eller ældre nyheder tæller ikke, uanset hvor relevante de ellers er.
 - Bland gerne brancher og virksomhedsstørrelser over tid; undgå at researche samme branche som sidst, hvis du kan se mønstre i den eksisterende liste.
-- Det er helt fint — og forventet på en stille nyhedsdag — at levere færre end 20. Fyld ALDRIG listen op med gårsdagens eller ældre nyheder for at nå et bestemt antal.
+- Det er helt fint — og forventet på en stille nyhedsdag — at levere færre end ${PER_RUN_TARGET}. Fyld ALDRIG listen op med gårsdagens eller ældre nyheder for at nå et bestemt antal.
 
 Scoring (breakdown, summer til score):
 - contact (0-30): højere jo mere direkte/relevant kontaktperson du fandt (navngivet + direkte mail = højt).
@@ -179,7 +187,7 @@ Eksempel på et fuldt, korrekt udfyldt element (brug dette KUN som stilistisk sk
   }
 }
 
-Når du er færdig med at søge og har fundet så mange solide, ægte kandidater med nyheder fra i dag som findes (op til 20), kald submit_companies med dem. Kald den kun én gang, som dit sidste skridt.`;
+Når du er færdig med at søge og har fundet så mange solide, ægte kandidater med nyheder fra i dag som findes (op til ${PER_RUN_TARGET}), kald submit_companies med dem. Kald den kun én gang, som dit sidste skridt.`;
 }
 
 function buildUserPrompt(existingNames: string[], todayDa: string): string {
@@ -189,7 +197,7 @@ function buildUserPrompt(existingNames: string[], todayDa: string): string {
     "Eksisterende virksomheder i databasen (find IKKE disse igen, søg efter helt nye):",
     existingNames.join(", "),
     "",
-    `Find op til 20 nye danske virksomheder med en ægte nyhedshistorie offentliggjort i dag, ${todayDa} — ikke ældre nyheder — og lever fuld research på dem via submit_companies. Lever hellere færre end 20, hvis der ikke er nok ægte nyheder fra præcis i dag.`,
+    `Find op til ${PER_RUN_TARGET} nye danske virksomheder med en ægte nyhedshistorie offentliggjort i dag, ${todayDa} — ikke ældre nyheder — og lever fuld research på dem via submit_companies. Lever hellere færre end ${PER_RUN_TARGET}, hvis der ikke er nok ægte nyheder fra præcis i dag.`,
   ].join("\n");
 }
 
@@ -256,7 +264,7 @@ async function run(request: Request): Promise<Response> {
 
   const client = new Anthropic();
   const tools: Anthropic.Messages.ToolUnion[] = [
-    { type: "web_search_20260209", name: "web_search", max_uses: 150 },
+    { type: "web_search_20260209", name: "web_search", max_uses: 40 },
     SUBMIT_COMPANIES_TOOL,
   ];
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: buildUserPrompt(existingNames, todayDa) }];
@@ -268,7 +276,7 @@ async function run(request: Request): Promise<Response> {
     try {
       const stream = client.messages.stream({
         model: "claude-sonnet-5",
-        max_tokens: 64000,
+        max_tokens: 20000,
         system: buildSystemPrompt(todayDa),
         thinking: { type: "adaptive" },
         output_config: { effort: "high" },
@@ -313,7 +321,7 @@ async function run(request: Request): Promise<Response> {
   const inserted: string[] = [];
   const skipped: string[] = [];
 
-  for (const c of submitted.companies.slice(0, 20)) {
+  for (const c of submitted.companies.slice(0, PER_RUN_TARGET)) {
     const key = c.name.trim().toLowerCase();
     if (seenNames.has(key) || !isValidTier(c.tier.key)) {
       skipped.push(c.name);
