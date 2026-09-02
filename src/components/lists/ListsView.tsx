@@ -215,7 +215,7 @@ export function ListsView({
                       Ingen virksomheder i denne liste endnu.
                     </div>
                   ) : (
-                    <div style={{ overflowX: "auto", marginTop: 12 }}>
+                    <div className="list-table-wrap" style={{ marginTop: 12 }}>
                       <table className="list-table">
                         <thead>
                           <tr>
