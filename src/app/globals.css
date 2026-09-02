@@ -387,13 +387,15 @@ input,select{ font-family:inherit; }
 .mini-badge.on{ color:var(--cool); border-color:var(--cool); background:var(--cool-soft); }
 .card-meta time{ font-size:11px; color:var(--text-faint); font-family:var(--font-mono); }
 .card-dist{ font-size:11px; color:var(--text-faint); font-family:var(--font-mono); }
-.star-btn{ background:none; border:none; cursor:pointer; padding:2px; line-height:1; font-size:19px; color:var(--border); flex-shrink:0; }
+.star-btn{
+  background:none; border:none; cursor:pointer; line-height:1; font-size:19px; color:var(--border); flex-shrink:0;
+  width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center;
+}
 .star-btn:hover{ color:var(--star); }
 .star-btn.starred{ color:var(--star); }
-.card-star{ position:absolute; top:10px; right:10px; }
+.card-star{ position:absolute; top:8px; right:8px; }
 .list-menu{ position:relative; }
-.card-list-menu{ position:absolute; top:38px; right:10px; }
-.list-btn{ display:inline-flex; align-items:center; justify-content:center; }
+.card-list-menu{ position:absolute; top:36px; right:8px; }
 .list-btn.has-lists{ color:var(--accent); }
 .list-dropdown{
   display:flex; flex-direction:column; gap:2px; position:absolute; top:26px; right:0; z-index:20; min-width:200px;
@@ -462,7 +464,6 @@ input,select{ font-family:inherit; }
 .mail-subject span{ color:var(--text-faint); font-weight:500; text-transform:uppercase; font-size:10.5px; letter-spacing:0.04em; display:block; margin-bottom:2px; }
 .mail-body{ padding:14px; white-space:pre-wrap; font-size:13.5px; line-height:1.65; color:var(--text); }
 .mail-actions{ display:flex; gap:8px; margin-top:10px; }
-.drawer-star{ display:flex; align-items:center; }
 
 /* ===== status pipeline ===== */
 .status-pill{
@@ -527,7 +528,7 @@ input,select{ font-family:inherit; }
 .list-table tr:last-child td{ border-bottom:none; }
 .list-table-row{ cursor:pointer; transition:background 0.1s ease; }
 .list-table-row:hover td{ background:var(--surface-2); }
-.list-table-row:hover td:first-child{ color:var(--text); font-weight:600; }
+.list-table-row:hover td:first-child{ color:var(--text); }
 .inprogress-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); font-size:12.5px; flex-wrap:wrap; }
 .inprogress-row:last-child{ border-bottom:none; }
 .inprogress-row b{ font-size:13px; }

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type TeamListOption = { id: string; name: string };
+
+const CLOSE_DELAY_MS = 350;
 
 export function ListMenu({
   companyName,
@@ -21,8 +23,31 @@ export function ListMenu({
 }) {
   const [open, setOpen] = useState(false);
   const [newListName, setNewListName] = useState("");
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function close() {
+  useEffect(() => {
+    return () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
+  }, []);
+
+  function cancelScheduledClose() {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }
+
+  function scheduleClose() {
+    cancelScheduledClose();
+    closeTimer.current = setTimeout(() => {
+      setOpen(false);
+      setNewListName("");
+    }, CLOSE_DELAY_MS);
+  }
+
+  function closeNow() {
+    cancelScheduledClose();
     setOpen(false);
     setNewListName("");
   }
@@ -31,11 +56,15 @@ export function ListMenu({
     const trimmed = newListName.trim();
     if (!trimmed) return;
     onCreateList(trimmed);
-    close();
+    closeNow();
   }
 
   return (
-    <div className={`list-menu${className ? ` ${className}` : ""}`} onMouseLeave={close}>
+    <div
+      className={`list-menu${className ? ` ${className}` : ""}`}
+      onMouseEnter={cancelScheduledClose}
+      onMouseLeave={scheduleClose}
+    >
       <button
         type="button"
         className={`star-btn list-btn${listIds.size ? " has-lists" : ""}`}
@@ -46,7 +75,7 @@ export function ListMenu({
           setOpen((v) => !v);
         }}
       >
-        <svg viewBox="0 0 24 24" fill="none" width={16} height={16}>
+        <svg viewBox="0 0 24 24" fill="none" width={17} height={17}>
           <path
             d="M3.5 7.2a1.5 1.5 0 0 1 1.5-1.5h4.1l1.8 1.8H19a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V7.2Z"
             stroke="currentColor"
