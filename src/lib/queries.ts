@@ -35,7 +35,7 @@ export async function getTeamMembers(teamId: string, ownerId: string): Promise<T
     userId: m.userId,
     name: m.user.name,
     email: m.user.email,
-    avatarDataUrl: m.user.avatarDataUrl,
+    avatarDataUrl: m.user.avatarDataUrl ?? m.user.image,
     role: m.role as "admin" | "member",
     isOwner: m.userId === ownerId,
     joinedAt: m.joinedAt,

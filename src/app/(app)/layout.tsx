@@ -34,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div id="appShell" className="show" style={{ display: "grid" }}>
           <Sidebar teamName={team.name} teamId={team.id} userTeams={userTeams} companyCount={companyCount} />
           <div className="main">
-            <Topbar name={user.name} avatarDataUrl={user.avatarDataUrl} />
+            <Topbar name={user.name} avatarDataUrl={user.avatarDataUrl ?? user.image} />
             <div className="pages">
               <div className="page enter">{children}</div>
             </div>
