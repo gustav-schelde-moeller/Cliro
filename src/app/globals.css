@@ -401,6 +401,7 @@ input,select{ font-family:inherit; }
 .card-star{ position:absolute; top:8px; right:8px; }
 .list-menu{ position:relative; }
 .card-list-menu{ position:absolute; top:36px; right:8px; }
+.list-btn:hover{ color:var(--accent); }
 .list-btn.has-lists{ color:var(--accent); }
 .list-dropdown{
   display:flex; flex-direction:column; gap:2px; position:absolute; top:26px; right:0; z-index:20; min-width:200px;
