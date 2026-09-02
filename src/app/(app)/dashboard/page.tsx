@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getActiveTeamId } from "@/lib/session-team";
-import { getTeamLeadsMap, getActivityLog, getUserStars } from "@/lib/queries";
+import { getTeamLeadsMap, getActivityLog, getUserStars, getTeamLists, getCompanyListMemberships } from "@/lib/queries";
 import { getCompanies } from "@/lib/companies";
 import { STATUS_DEFS } from "@/lib/status";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
@@ -24,13 +24,18 @@ export default async function DashboardPage() {
   const teamId = await getActiveTeamId(session.user.id);
   if (!teamId) redirect("/team-gate");
 
-  const [COMPANIES, leadsMap, activity, starCount, userStars] = await Promise.all([
+  const [COMPANIES, leadsMap, activity, starCount, userStars, teamLists, listMembershipsMap] = await Promise.all([
     getCompanies(),
     getTeamLeadsMap(teamId),
     getActivityLog(teamId, 20),
     prisma.star.count({ where: { userId: session.user.id } }),
     getUserStars(session.user.id),
+    getTeamLists(teamId),
+    getCompanyListMemberships(teamId),
   ]);
+  const listMembershipsPlain = Object.fromEntries(
+    Array.from(listMembershipsMap.entries()).map(([companyId, listIds]) => [companyId, Array.from(listIds)]),
+  );
 
   const counts: Record<string, number> = { new: 0, contacted: 0, meeting: 0, won: 0, lost: 0 };
   for (const c of COMPANIES) {
@@ -97,6 +102,8 @@ export default async function DashboardPage() {
           myName={session.user.name ?? "Ukendt"}
           initialLeads={activeLeads}
           initialStars={[...userStars]}
+          initialTeamLists={teamLists.map((l) => ({ id: l.id, name: l.name }))}
+          initialListMemberships={listMembershipsPlain}
         />
       </div>
     </section>

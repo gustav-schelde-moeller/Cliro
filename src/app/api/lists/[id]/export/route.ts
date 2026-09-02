@@ -1,15 +1,7 @@
+import ExcelJS from "exceljs";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCompanies } from "@/lib/companies";
-
-function csvField(value: string): string {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
-
-function toCsvRow(fields: string[]): string {
-  return fields.map(csvField).join(",");
-}
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: listId } = await params;
@@ -36,42 +28,76 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const allCompanies = await getCompanies();
   const companies = allCompanies.filter((c) => companyIds.has(c.id));
 
-  const header = toCsvRow([
-    "Navn",
-    "Branche",
-    "By",
-    "Score",
-    "Kontaktperson",
-    "Titel",
-    "Email",
-    "Note",
-    "Hjemmeside",
-    "Nyhed",
-    "Nyhedsdato",
-  ]);
-  const rows = companies.map((c) =>
-    toCsvRow([
-      c.name,
-      c.industry,
-      c.city,
-      String(c.score),
-      c.contact.name ?? "",
-      c.contact.title ?? "",
-      c.contact.email ?? "",
-      c.contact.note ?? "",
-      c.website,
-      c.hook.title,
-      c.hook.date,
-    ]),
-  );
-  const csv = "﻿" + [header, ...rows].join("\r\n");
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Cliro";
+  workbook.created = new Date();
 
-  const filename = `${list.name.replace(/[^\p{L}\p{N}_-]+/gu, "_")}.csv`;
+  const sheetName = list.name.slice(0, 31).replace(/[[\]*?:/\\]/g, " ") || "Liste";
+  const sheet = workbook.addWorksheet(sheetName, {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
 
-  return new Response(csv, {
+  sheet.columns = [
+    { header: "Navn", key: "name", width: 26 },
+    { header: "Branche", key: "industry", width: 20 },
+    { header: "By", key: "city", width: 16 },
+    { header: "Score", key: "score", width: 9 },
+    { header: "Kontaktperson", key: "contactName", width: 22 },
+    { header: "Titel", key: "contactTitle", width: 22 },
+    { header: "Email", key: "email", width: 30 },
+    { header: "Note", key: "note", width: 34 },
+    { header: "Hjemmeside", key: "website", width: 22 },
+    { header: "Nyhed", key: "hook", width: 40 },
+    { header: "Nyhedsdato", key: "hookDate", width: 18 },
+  ];
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2F55FC" } };
+  headerRow.alignment = { vertical: "middle" };
+  headerRow.height = 22;
+  sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: sheet.columns.length } };
+
+  companies.forEach((c, i) => {
+    const row = sheet.addRow({
+      name: c.name,
+      industry: c.industry,
+      city: c.city,
+      score: c.score,
+      contactName: c.contact.name ?? "",
+      contactTitle: c.contact.title ?? "",
+      email: c.contact.email ?? "",
+      note: c.contact.note ?? "",
+      website: c.website,
+      hook: c.hook.title,
+      hookDate: c.hook.date,
+    });
+    row.alignment = { vertical: "top", wrapText: true };
+    if (i % 2 === 1) {
+      row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF171B24" } };
+    }
+  });
+
+  sheet.eachRow((row) => {
+    row.eachCell((cell) => {
+      cell.border = {
+        bottom: { style: "thin", color: { argb: "FF2A2E38" } },
+      };
+    });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const safeName = list.name.replace(/[^\p{L}\p{N}_-]+/gu, "_") || "Liste";
+  // Content-Disposition filenames are limited to ISO-8859-1 for the plain
+  // `filename` param — non-Latin1 characters (æøå etc.) need the RFC 5987
+  // filename* form, or browsers show mojibake instead of the real name.
+  const asciiFallback = safeName.replace(/[^\x00-\x7F]/g, "_");
+  const encodedName = encodeURIComponent(safeName);
+
+  return new Response(buffer, {
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${asciiFallback}.xlsx"; filename*=UTF-8''${encodedName}.xlsx`,
     },
   });
 }

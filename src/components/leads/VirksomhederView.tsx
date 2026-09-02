@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { haversineKm, type Company } from "@/lib/companies";
 import { LeadCard, type LeadState, type TeamListOption } from "./LeadCard";
 import { LeadDrawer } from "./LeadDrawer";
-import { useToast, errorMessage } from "@/components/shared/ToastProvider";
-import { setLeadStatusAction, assignToMeAction, releaseAssignmentAction, toggleStarAction } from "@/lib/actions/lead-actions";
-import { toggleCompanyInListAction, createListAndAddAction } from "@/lib/actions/list-actions";
+import { useLeadMutations } from "./useLeadMutations";
+import { useToast } from "@/components/shared/ToastProvider";
 
 const PAGE_SIZE = 6;
 const TIER_DEFS = [
@@ -47,13 +45,19 @@ export function VirksomhederView({
   initialTeamLists: TeamListOption[];
   initialListMemberships: Record<number, string[]>;
 }) {
-  const router = useRouter();
   const { showToast } = useToast();
-
-  const [leads, setLeads] = useState<Record<number, LeadState>>(initialLeads);
-  const [starred, setStarred] = useState<Set<number>>(new Set(initialStars));
-  const [teamLists, setTeamLists] = useState<TeamListOption[]>(initialTeamLists);
-  const [listMemberships, setListMemberships] = useState<Record<number, string[]>>(initialListMemberships);
+  const {
+    starred,
+    teamLists,
+    listMemberships,
+    leadOf,
+    handleToggleStar,
+    handleSetStatus,
+    handleAssign,
+    handleRelease,
+    handleToggleList,
+    handleCreateList,
+  } = useLeadMutations({ teamId, myName, initialLeads, initialStars, initialTeamLists, initialListMemberships });
 
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState<Tier>("all");
@@ -70,8 +74,6 @@ export function VirksomhederView({
   const [infoOpen, setInfoOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [locating, setLocating] = useState(false);
-
-  const leadOf = (id: number): LeadState => leads[id] ?? { status: "new", assigneeId: null, assigneeName: null };
 
   const todayDa = TODAY_FORMATTER.format(new Date());
 
@@ -174,85 +176,6 @@ export function VirksomhederView({
       },
       { timeout: 10000 }
     );
-  }
-
-  async function handleToggleStar(id: number) {
-    const wasStarred = starred.has(id);
-    setStarred((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    try {
-      await toggleStarAction(id);
-    } catch (err) {
-      setStarred((prev) => {
-        const next = new Set(prev);
-        if (wasStarred) next.add(id);
-        else next.delete(id);
-        return next;
-      });
-      showToast(errorMessage(err, "Kunne ikke gemme stjernemarkeringen."));
-    }
-  }
-
-  async function handleToggleList(companyId: number, listId: string) {
-    const current = listMemberships[companyId] ?? [];
-    const next = current.includes(listId) ? current.filter((id) => id !== listId) : [...current, listId];
-    setListMemberships((prev) => ({ ...prev, [companyId]: next }));
-    try {
-      await toggleCompanyInListAction(teamId, listId, companyId);
-    } catch (err) {
-      setListMemberships((prev) => ({ ...prev, [companyId]: current }));
-      showToast(errorMessage(err, "Kunne ikke opdatere listen."));
-    }
-  }
-
-  async function handleCreateList(companyId: number, name: string) {
-    try {
-      const newList = await createListAndAddAction(teamId, name, companyId);
-      setTeamLists((prev) => [...prev, newList]);
-      setListMemberships((prev) => ({ ...prev, [companyId]: [...(prev[companyId] ?? []), newList.id] }));
-    } catch (err) {
-      showToast(errorMessage(err, "Kunne ikke oprette listen."));
-    }
-  }
-
-  async function handleSetStatus(id: number, status: string) {
-    const prevLead = leadOf(id);
-    setLeads((prev) => ({ ...prev, [id]: { ...prevLead, status } }));
-    try {
-      await setLeadStatusAction(teamId, id, status);
-      router.refresh();
-    } catch (err) {
-      setLeads((prev) => ({ ...prev, [id]: prevLead }));
-      showToast(errorMessage(err, "Kunne ikke opdatere status."));
-    }
-  }
-
-  async function handleAssign(id: number) {
-    const prevLead = leadOf(id);
-    setLeads((prev) => ({ ...prev, [id]: { ...prevLead, assigneeId: "me", assigneeName: myName } }));
-    try {
-      await assignToMeAction(teamId, id);
-      router.refresh();
-    } catch (err) {
-      setLeads((prev) => ({ ...prev, [id]: prevLead }));
-      showToast(errorMessage(err, "Kunne ikke tildele virksomheden."));
-    }
-  }
-
-  async function handleRelease(id: number) {
-    const prevLead = leadOf(id);
-    setLeads((prev) => ({ ...prev, [id]: { ...prevLead, assigneeId: null, assigneeName: null } }));
-    try {
-      await releaseAssignmentAction(teamId, id);
-      router.refresh();
-    } catch (err) {
-      setLeads((prev) => ({ ...prev, [id]: prevLead }));
-      showToast(errorMessage(err, "Kunne ikke frigive tildelingen."));
-    }
   }
 
   const selectedCompany = selectedId != null ? companies.find((c) => c.id === selectedId) ?? null : null;
@@ -442,12 +365,16 @@ export function VirksomhederView({
           company={selectedCompany}
           lead={leadOf(selectedCompany.id)}
           starred={starred.has(selectedCompany.id)}
+          teamLists={teamLists}
+          listIds={new Set(listMemberships[selectedCompany.id] ?? [])}
           myName={myName}
           onClose={() => setSelectedId(null)}
           onToggleStar={() => handleToggleStar(selectedCompany.id)}
           onSetStatus={(status) => handleSetStatus(selectedCompany.id, status)}
           onAssign={() => handleAssign(selectedCompany.id)}
           onRelease={() => handleRelease(selectedCompany.id)}
+          onToggleList={(listId) => handleToggleList(selectedCompany.id, listId)}
+          onCreateList={(name) => handleCreateList(selectedCompany.id, name)}
         />
       ) : null}
     </section>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Company } from "@/lib/companies";
 import { STATUS_DEFS, statusLabel } from "@/lib/status";
 import type { LeadState } from "./LeadCard";
+import { ListMenu, type TeamListOption } from "./ListMenu";
 import { useToast } from "@/components/shared/ToastProvider";
 
 function BdRow({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
@@ -25,22 +26,30 @@ export function LeadDrawer({
   company,
   lead,
   starred,
+  teamLists,
+  listIds,
   myName,
   onClose,
   onToggleStar,
   onSetStatus,
   onAssign,
   onRelease,
+  onToggleList,
+  onCreateList,
 }: {
   company: Company;
   lead: LeadState;
   starred: boolean;
+  teamLists: TeamListOption[];
+  listIds: Set<string>;
   myName: string;
   onClose: () => void;
   onToggleStar: () => void;
   onSetStatus: (status: string) => void;
   onAssign: () => void;
   onRelease: () => void;
+  onToggleList: (listId: string) => void;
+  onCreateList: (name: string) => void;
 }) {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const { showToast } = useToast();
@@ -74,6 +83,14 @@ export function LeadDrawer({
             <button type="button" className={`star-btn drawer-star${starred ? " starred" : ""}`} aria-label="Stjernemarkér" title="Stjernemarkér" onClick={onToggleStar}>
               ★
             </button>
+            <ListMenu
+              className="drawer-list-menu"
+              companyName={company.name}
+              teamLists={teamLists}
+              listIds={listIds}
+              onToggleList={onToggleList}
+              onCreateList={onCreateList}
+            />
             <button type="button" className="drawer-close" aria-label="Luk" onClick={onClose}>
               <svg viewBox="0 0 24 24" fill="none" width={16} height={16}>
                 <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
