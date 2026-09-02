@@ -51,6 +51,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     { header: "Nyhedsdato", key: "hookDate", width: 18 },
   ];
 
+  // Spreadsheet apps render on a white canvas regardless of the viewer's own
+  // dark/light theme preference — colors here need to be legible against
+  // white, not matched to the app's own dark UI (an earlier version used a
+  // near-black alternating row fill with default black text, which was
+  // nearly unreadable).
   const headerRow = sheet.getRow(1);
   headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
   headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2F55FC" } };
@@ -72,16 +77,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       hook: c.hook.title,
       hookDate: c.hook.date,
     });
+    row.font = { color: { argb: "FF1A1D24" } };
     row.alignment = { vertical: "top", wrapText: true };
+    row.height = 30;
     if (i % 2 === 1) {
-      row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF171B24" } };
+      row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F3F5" } };
     }
   });
 
   sheet.eachRow((row) => {
     row.eachCell((cell) => {
       cell.border = {
-        bottom: { style: "thin", color: { argb: "FF2A2E38" } },
+        bottom: { style: "thin", color: { argb: "FFE2E5E9" } },
       };
     });
   });
