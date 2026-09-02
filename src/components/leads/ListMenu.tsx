@@ -75,9 +75,9 @@ export function ListMenu({
           setOpen((v) => !v);
         }}
       >
-        <svg viewBox="0 0 24 24" width={22} height={22} fill={listIds.size ? "currentColor" : "none"}>
+        <svg viewBox="0 0 24 24" width={24} height={24} fill={listIds.size ? "currentColor" : "none"}>
           <path
-            d="M3 6.8C3 5.8 3.8 5 4.8 5h4.3l2 2h8.1c1 0 1.8.8 1.8 1.8v8.4c0 1-.8 1.8-1.8 1.8H4.8C3.8 19 3 18.2 3 17.2V6.8Z"
+            d="M1.5 5.5C1.5 4.4 2.4 3.5 3.5 3.5H9.3l2.3 2.3H20.5C21.6 5.8 22.5 6.7 22.5 7.8V18.5C22.5 19.6 21.6 20.5 20.5 20.5H3.5C2.4 20.5 1.5 19.6 1.5 18.5V5.5Z"
             stroke={listIds.size ? "none" : "currentColor"}
             strokeWidth="1.8"
             strokeLinejoin="round"
