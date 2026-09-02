@@ -43,6 +43,11 @@ const config: NextAuthConfig = {
           Google({
             clientId: process.env.GOOGLE_CLIENT_ID,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            // Team members already have email/password accounts. Google
+            // verifies email ownership before allowing sign-in, so it's
+            // safe to link a Google sign-in to an existing account with
+            // the same email instead of rejecting it as unlinked.
+            allowDangerousEmailAccountLinking: true,
           }),
         ]
       : []),
