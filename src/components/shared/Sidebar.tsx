@@ -30,6 +30,17 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/lister",
+    label: "Lister",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none">
+        <rect x="3.5" y="4.5" width="17" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.7" />
+        <rect x="3.5" y="10.5" width="17" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.7" />
+        <rect x="3.5" y="16.5" width="17" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.7" />
+      </svg>
+    ),
+  },
+  {
     href: "/team",
     label: "Team",
     icon: (

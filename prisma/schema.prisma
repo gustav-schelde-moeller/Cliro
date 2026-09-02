@@ -78,6 +78,7 @@ model Team {
   members  TeamMember[]
   leads    Lead[]
   activity ActivityLog[]
+  lists    CompanyList[]
 }
 
 model TeamMember {
@@ -157,6 +158,34 @@ model ActivityLog {
 
   team Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// Named, team-shared batches of companies (e.g. "Denne uges ringerunde")
+// for organizing and exporting call sessions. companyId is a loose
+// reference to Company.id, same convention as Lead/Star.
+model CompanyList {
+  id        String   @id @default(cuid())
+  teamId    String
+  name      String
+  createdBy String
+  createdAt DateTime @default(now())
+
+  team  Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  items CompanyListItem[]
+
+  @@unique([teamId, name])
+}
+
+model CompanyListItem {
+  id        String   @id @default(cuid())
+  listId    String
+  companyId Int
+  addedBy   String
+  addedAt   DateTime @default(now())
+
+  list CompanyList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, companyId])
 }
 
 model PasswordResetToken {

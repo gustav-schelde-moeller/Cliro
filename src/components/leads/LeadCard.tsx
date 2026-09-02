@@ -1,31 +1,49 @@
 "use client";
 
+import { useState } from "react";
 import type { Company } from "@/lib/companies";
 import { statusLabel } from "@/lib/status";
 
 export type LeadState = { status: string; assigneeId: string | null; assigneeName: string | null };
+export type TeamListOption = { id: string; name: string };
 
 export function LeadCard({
   company,
   lead,
   starred,
   isNew,
+  teamLists,
+  listIds,
   distanceKm,
   index,
   onOpen,
   onToggleStar,
   onAssign,
+  onToggleList,
+  onCreateList,
 }: {
   company: Company;
   lead: LeadState;
   starred: boolean;
   isNew?: boolean;
+  teamLists: TeamListOption[];
+  listIds: Set<string>;
   distanceKm: number | null;
   index: number;
   onOpen: () => void;
   onToggleStar: () => void;
   onAssign: () => void;
+  onToggleList: (listId: string) => void;
+  onCreateList: (name: string) => void;
 }) {
+  const [listMenuOpen, setListMenuOpen] = useState(false);
+  const [newListName, setNewListName] = useState("");
+
+  function closeListMenu() {
+    setListMenuOpen(false);
+    setNewListName("");
+  }
+
   return (
     <div
       className="card"
@@ -53,6 +71,71 @@ export function LeadCard({
       >
         {starred ? "★" : "☆"}
       </button>
+      <div className="list-menu card-list-menu">
+        <button
+          type="button"
+          className={`star-btn list-btn${listIds.size ? " has-lists" : ""}`}
+          aria-label={`Tilføj ${company.name} til en liste`}
+          title="Tilføj til liste"
+          onClick={(e) => {
+            e.stopPropagation();
+            setListMenuOpen((v) => !v);
+          }}
+        >
+          🗂
+        </button>
+        {listMenuOpen ? (
+          <>
+            <div
+              className="list-menu-backdrop"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeListMenu();
+              }}
+            />
+            <div className="list-dropdown" onClick={(e) => e.stopPropagation()}>
+              {teamLists.length === 0 ? (
+                <div className="list-dropdown-empty">Ingen lister endnu</div>
+              ) : (
+                teamLists.map((l) => (
+                  <label className="list-opt" key={l.id}>
+                    <input type="checkbox" checked={listIds.has(l.id)} onChange={() => onToggleList(l.id)} />
+                    {l.name}
+                  </label>
+                ))
+              )}
+              <div className="list-dropdown-divider" />
+              <div className="list-create-row">
+                <input
+                  type="text"
+                  className="field"
+                  placeholder="+ Ny liste"
+                  value={newListName}
+                  maxLength={60}
+                  onChange={(e) => setNewListName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newListName.trim()) {
+                      onCreateList(newListName.trim());
+                      closeListMenu();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={!newListName.trim()}
+                  onClick={() => {
+                    onCreateList(newListName.trim());
+                    closeListMenu();
+                  }}
+                >
+                  Opret
+                </button>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </div>
       <div className={`score-badge tier-${company.tier.key}`}>
         <b>{company.score}</b>
         <span>score</span>

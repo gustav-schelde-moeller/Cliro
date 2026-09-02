@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { haversineKm, type Company } from "@/lib/companies";
-import { LeadCard, type LeadState } from "./LeadCard";
+import { LeadCard, type LeadState, type TeamListOption } from "./LeadCard";
 import { LeadDrawer } from "./LeadDrawer";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
 import { setLeadStatusAction, assignToMeAction, releaseAssignmentAction, toggleStarAction } from "@/lib/actions/lead-actions";
+import { toggleCompanyInListAction, createListAndAddAction } from "@/lib/actions/list-actions";
 
 const PAGE_SIZE = 6;
 const TIER_DEFS = [
@@ -35,18 +36,24 @@ export function VirksomhederView({
   myName,
   initialLeads,
   initialStars,
+  initialTeamLists,
+  initialListMemberships,
 }: {
   companies: Company[];
   teamId: string;
   myName: string;
   initialLeads: Record<number, LeadState>;
   initialStars: number[];
+  initialTeamLists: TeamListOption[];
+  initialListMemberships: Record<number, string[]>;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
 
   const [leads, setLeads] = useState<Record<number, LeadState>>(initialLeads);
   const [starred, setStarred] = useState<Set<number>>(new Set(initialStars));
+  const [teamLists, setTeamLists] = useState<TeamListOption[]>(initialTeamLists);
+  const [listMemberships, setListMemberships] = useState<Record<number, string[]>>(initialListMemberships);
 
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState<Tier>("all");
@@ -187,6 +194,28 @@ export function VirksomhederView({
         return next;
       });
       showToast(errorMessage(err, "Kunne ikke gemme stjernemarkeringen."));
+    }
+  }
+
+  async function handleToggleList(companyId: number, listId: string) {
+    const current = listMemberships[companyId] ?? [];
+    const next = current.includes(listId) ? current.filter((id) => id !== listId) : [...current, listId];
+    setListMemberships((prev) => ({ ...prev, [companyId]: next }));
+    try {
+      await toggleCompanyInListAction(teamId, listId, companyId);
+    } catch (err) {
+      setListMemberships((prev) => ({ ...prev, [companyId]: current }));
+      showToast(errorMessage(err, "Kunne ikke opdatere listen."));
+    }
+  }
+
+  async function handleCreateList(companyId: number, name: string) {
+    try {
+      const newList = await createListAndAddAction(teamId, name, companyId);
+      setTeamLists((prev) => [...prev, newList]);
+      setListMemberships((prev) => ({ ...prev, [companyId]: [...(prev[companyId] ?? []), newList.id] }));
+    } catch (err) {
+      showToast(errorMessage(err, "Kunne ikke oprette listen."));
     }
   }
 
@@ -385,11 +414,15 @@ export function VirksomhederView({
               lead={leadOf(c.id)}
               starred={starred.has(c.id)}
               isNew={isNewCompany(c, todayDa)}
+              teamLists={teamLists}
+              listIds={new Set(listMemberships[c.id] ?? [])}
               distanceKm={myLocation ? haversineKm(myLocation.lat, myLocation.lng, c.lat, c.lng) : null}
               index={idx}
               onOpen={() => setSelectedId(c.id)}
               onToggleStar={() => handleToggleStar(c.id)}
               onAssign={() => handleAssign(c.id)}
+              onToggleList={(listId) => handleToggleList(c.id, listId)}
+              onCreateList={(name) => handleCreateList(c.id, name)}
             />
           ))
         )}

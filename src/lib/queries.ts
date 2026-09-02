@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { getCompanies, type Company } from "./companies";
 
 export type TeamMemberInfo = {
   userId: string;
@@ -71,6 +72,79 @@ export async function getActivityLog(teamId: string, limit: number) {
     orderBy: { createdAt: "desc" },
     take: limit,
   });
+}
+
+export type CompanyListInfo = {
+  id: string;
+  name: string;
+  createdAt: Date;
+  createdByName: string | null;
+  itemCount: number;
+};
+
+export async function getTeamLists(teamId: string): Promise<CompanyListInfo[]> {
+  const lists = await prisma.companyList.findMany({
+    where: { teamId },
+    include: { items: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const creatorIds = Array.from(new Set(lists.map((l) => l.createdBy)));
+  const creators = await prisma.user.findMany({ where: { id: { in: creatorIds } }, select: { id: true, name: true } });
+  const creatorNames = new Map(creators.map((c) => [c.id, c.name]));
+  return lists.map((l) => ({
+    id: l.id,
+    name: l.name,
+    createdAt: l.createdAt,
+    createdByName: creatorNames.get(l.createdBy) ?? null,
+    itemCount: l.items.length,
+  }));
+}
+
+// Map of companyId -> set of list IDs that company currently belongs to,
+// for rendering per-card "which lists is this in" checkboxes.
+export async function getCompanyListMemberships(teamId: string): Promise<Map<number, Set<string>>> {
+  const items = await prisma.companyListItem.findMany({
+    where: { list: { teamId } },
+    select: { companyId: true, listId: true },
+  });
+  const map = new Map<number, Set<string>>();
+  for (const item of items) {
+    const set = map.get(item.companyId) ?? new Set<string>();
+    set.add(item.listId);
+    map.set(item.companyId, set);
+  }
+  return map;
+}
+
+export type CompanyListWithCompanies = {
+  id: string;
+  name: string;
+  createdAt: Date;
+  createdByName: string | null;
+  companies: Company[];
+};
+
+export async function getListsWithCompanies(teamId: string): Promise<CompanyListWithCompanies[]> {
+  const [lists, allCompanies] = await Promise.all([
+    prisma.companyList.findMany({
+      where: { teamId },
+      include: { items: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    getCompanies(),
+  ]);
+  const companyById = new Map(allCompanies.map((c) => [c.id, c]));
+  const creatorIds = Array.from(new Set(lists.map((l) => l.createdBy)));
+  const creators = await prisma.user.findMany({ where: { id: { in: creatorIds } }, select: { id: true, name: true } });
+  const creatorNames = new Map(creators.map((c) => [c.id, c.name]));
+
+  return lists.map((l) => ({
+    id: l.id,
+    name: l.name,
+    createdAt: l.createdAt,
+    createdByName: creatorNames.get(l.createdBy) ?? null,
+    companies: l.items.map((i) => companyById.get(i.companyId)).filter((c): c is Company => Boolean(c)),
+  }));
 }
 
 export async function getUserTeams(userId: string) {
