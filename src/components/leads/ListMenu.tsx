@@ -75,12 +75,10 @@ export function ListMenu({
           setOpen((v) => !v);
         }}
       >
-        <svg viewBox="0 0 24 24" fill="none" width={20} height={20}>
+        <svg viewBox="0 0 24 24" width={21} height={21}>
           <path
-            d="M3 6.8a1.6 1.6 0 0 1 1.6-1.6h4.3l2 2H19.4a1.6 1.6 0 0 1 1.6 1.6v8.6a1.6 1.6 0 0 1-1.6 1.6H4.6A1.6 1.6 0 0 1 3 17.4V6.8Z"
-            stroke="currentColor"
-            strokeWidth="2.1"
-            strokeLinejoin="round"
+            d="M3 6.8C3 5.8 3.8 5 4.8 5h4.3l2 2h8.1c1 0 1.8.8 1.8 1.8v8.4c0 1-.8 1.8-1.8 1.8H4.8C3.8 19 3 18.2 3 17.2V6.8Z"
+            fill="currentColor"
           />
         </svg>
       </button>

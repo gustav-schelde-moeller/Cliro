@@ -81,7 +81,7 @@ export function LeadDrawer({
           </div>
           <div className="drawer-head-actions">
             <button type="button" className={`star-btn drawer-star${starred ? " starred" : ""}`} aria-label="Stjernemarkér" title="Stjernemarkér" onClick={onToggleStar}>
-              ★
+              {starred ? "★" : "☆"}
             </button>
             <ListMenu
               className="drawer-list-menu"

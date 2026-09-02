@@ -534,7 +534,7 @@ input,select{ font-family:inherit; }
 .list-table tr:last-child td{ border-bottom:none; }
 .list-table-row{ cursor:pointer; transition:background 0.1s ease; }
 .list-table-row:hover td{ background:var(--surface-2); }
-.list-table-row:hover td:first-child{ color:var(--text); -webkit-text-stroke:0.4px currentColor; }
+.list-table-row:hover td:first-child{ color:var(--text); -webkit-text-stroke:0.65px currentColor; }
 .inprogress-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); font-size:12.5px; flex-wrap:wrap; }
 .inprogress-row:last-child{ border-bottom:none; }
 .inprogress-row b{ font-size:13px; }
