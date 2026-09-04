@@ -12,11 +12,14 @@ export const maxDuration = 300;
 
 // Per-invocation target. Keep this low enough that a same-day research
 // sweep reliably finishes within maxDuration — 20 timed out, then 5 timed
-// out again even at output_config.effort "low" (a same-day sweep is
-// inherently variable in duration, and 300s is a hard platform ceiling).
-// .github/workflows/daily-research.yml schedules multiple runs per weekday
-// so the daily total still reaches a reasonable volume.
-const PER_RUN_TARGET = 3;
+// out again even at output_config.effort "low", then 3 still hit a hard
+// FUNCTION_INVOCATION_TIMEOUT (504) at the full 300s (a same-day sweep is
+// inherently variable in duration, dominated by real web-search/fetch
+// round trips to verify publish dates, and 300s is a hard platform
+// ceiling that can't be raised). .github/workflows/daily-research.yml
+// schedules multiple runs per weekday so the daily total still reaches a
+// reasonable volume even at 1 company per run.
+const PER_RUN_TARGET = 1;
 
 const TIER_LABELS: Record<Tier, string> = {
   hot: "Varm lead",
@@ -266,7 +269,7 @@ async function run(request: Request): Promise<Response> {
 
   const client = new Anthropic();
   const tools: Anthropic.Messages.ToolUnion[] = [
-    { type: "web_search_20260209", name: "web_search", max_uses: 15 },
+    { type: "web_search_20260209", name: "web_search", max_uses: 8 },
     SUBMIT_COMPANIES_TOOL,
   ];
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: buildUserPrompt(existingNames, todayDa) }];
@@ -274,8 +277,21 @@ async function run(request: Request): Promise<Response> {
   let submitted: { companies: SubmittedCompany[] } | null = null;
   let lastResponse: Anthropic.Message | null = null;
   let iterations = 0;
+  let timedOut = false;
+
+  // Vercel Hobby hard-kills the whole function at 300s (maxDuration) with
+  // an opaque FUNCTION_INVOCATION_TIMEOUT / 504 — no chance for our own
+  // catch block to run or return diagnostics. Bail out of the loop with a
+  // clean response once we're within one round trip of that ceiling
+  // instead of risking the platform killing us mid-request.
+  const startedAt = Date.now();
+  const SOFT_DEADLINE_MS = 260_000;
 
   for (let i = 0; i < 30 && !submitted; i++) {
+    if (Date.now() - startedAt > SOFT_DEADLINE_MS) {
+      timedOut = true;
+      break;
+    }
     iterations++;
     let response: Anthropic.Message;
     try {
@@ -327,8 +343,12 @@ async function run(request: Request): Promise<Response> {
       .join("\n") || null;
     return Response.json(
       {
-        error: "Claude leverede ikke et struktureret resultat",
+        error: timedOut
+          ? "Nåede blødt tidsloft før Claude leverede et resultat — stoppet før Vercel ville have dræbt funktionen"
+          : "Claude leverede ikke et struktureret resultat",
         diagnostics: {
+          timedOut,
+          elapsedMs: Date.now() - startedAt,
           iterations,
           lastStopReason: lastResponse?.stop_reason ?? null,
           finalText,
