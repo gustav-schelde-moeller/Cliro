@@ -29,7 +29,7 @@ const TIER_LABELS: Record<Tier, string> = {
 
 const SUBMIT_COMPANIES_TOOL: Anthropic.Tool = {
   name: "submit_companies",
-  description: `Submit the final list of newly researched companies. Call this once, after you are done searching, with up to ${PER_RUN_TARGET} companies that are not already in the existing-companies list. It is fine — expected, even — to submit fewer than ${PER_RUN_TARGET} if that's all the real same-day news supports.`,
+  description: `Submit the final list of newly researched companies. Call this once, after you are done searching, with up to ${PER_RUN_TARGET} companies that are not already in the existing-companies list. It is fine — expected, even — to submit fewer than ${PER_RUN_TARGET} if that's all the real, recent (today-or-yesterday) news supports.`,
   strict: true,
   input_schema: {
     type: "object",
@@ -134,19 +134,19 @@ const SUBMIT_COMPANIES_TOOL: Anthropic.Tool = {
   },
 };
 
-function buildSystemPrompt(todayDa: string): string {
+function buildSystemPrompt(todayDa: string, yesterdayDa: string): string {
   return `Du research danske virksomheder til DAVAI, et dansk produktionsselskab der laver reklamefilm og musikvideoer og bruger nyheder som anledning til at cold-calle virksomheder.
 
-Din opgave: find op til ${PER_RUN_TARGET} danske virksomheder med en ÆGTE, veldokumenteret nyhedshistorie offentliggjort i dag, ${todayDa} — IKKE en ældre nyhed, uanset hvor god den er — og saml research om dem, som sælgere hos DAVAI kan bruge til at ringe op.
+Din opgave: find op til ${PER_RUN_TARGET} danske virksomheder med en ÆGTE, veldokumenteret nyhedshistorie offentliggjort i dag (${todayDa}) eller i går (${yesterdayDa}) — IKKE en ældre nyhed, uanset hvor god den er — og saml research om dem, som sælgere hos DAVAI kan bruge til at ringe op.
 
-Brug web_search grundigt. Alt skal være ægte og efterprøveligt — find den faktiske nyhed med en rigtig kilde-URL og tjek at publiceringsdatoen på kilden faktisk er ${todayDa}, og forsøg at finde en navngiven, relevant kontaktperson (marketing/PR/kommunikation/CEO) med en kilde-URL eller LinkedIn-profil. Opfind ALDRIG navne, mailadresser eller nyheder. Hvis du ikke kan finde en navngiven kontakt, sæt contact.found=false og de øvrige contact-felter til null — gæt aldrig.
+Brug web_search grundigt, men fokuseret — du har et begrænset antal søgninger til rådighed, så brug dem effektivt frem for at afsøge udtømmende. Alt skal være ægte og efterprøveligt — find den faktiske nyhed med en rigtig kilde-URL og tjek at publiceringsdatoen på kilden faktisk er ${todayDa} eller ${yesterdayDa}, og forsøg at finde en navngiven, relevant kontaktperson (marketing/PR/kommunikation/CEO) med en kilde-URL eller LinkedIn-profil. Opfind ALDRIG navne, mailadresser eller nyheder. Hvis du ikke kan finde en navngiven kontakt, sæt contact.found=false og de øvrige contact-felter til null — gæt aldrig.
 
 Kriterier for de virksomheder du vælger:
 - Skal være et rigtigt dansk selskab (eller et internationalt selskab med markant dansk tilstedeværelse).
 - Må IKKE allerede findes i listen over eksisterende virksomheder, du får i brugerbeskeden — tjek navnet grundigt (stavevarianter, danske vs. engelske navne osv.).
-- Nyheden SKAL være fra i dag, ${todayDa} — ikke i går, ikke sidste uge. Generel virksomhedsinfo eller ældre nyheder tæller ikke, uanset hvor relevante de ellers er.
+- Nyheden SKAL være fra i dag (${todayDa}) eller i går (${yesterdayDa}) — ikke ældre. Generel virksomhedsinfo eller ældre nyheder tæller ikke, uanset hvor relevante de ellers er.
 - Bland gerne brancher og virksomhedsstørrelser over tid; undgå at researche samme branche som sidst, hvis du kan se mønstre i den eksisterende liste.
-- Det er helt fint — og forventet på en stille nyhedsdag — at levere færre end ${PER_RUN_TARGET}. Fyld ALDRIG listen op med gårsdagens eller ældre nyheder for at nå et bestemt antal.
+- Det er helt fint — og forventet på en stille nyhedsdag — at levere færre end ${PER_RUN_TARGET}. Fyld ALDRIG listen op med ældre nyheder for at nå et bestemt antal.
 
 Scoring (breakdown, summer til score):
 - contact (0-30): højere jo mere direkte/relevant kontaktperson du fandt (navngivet + direkte mail = højt).
@@ -192,17 +192,17 @@ Eksempel på et fuldt, korrekt udfyldt element (brug dette KUN som stilistisk sk
   }
 }
 
-Når du er færdig med at søge og har fundet så mange solide, ægte kandidater med nyheder fra i dag som findes (op til ${PER_RUN_TARGET}), kald submit_companies med dem. Kald den kun én gang, som dit sidste skridt.`;
+Når du er færdig med at søge og har fundet så mange solide, ægte kandidater med nyheder fra i dag eller i går som findes (op til ${PER_RUN_TARGET}), kald submit_companies med dem. Kald den kun én gang, som dit sidste skridt.`;
 }
 
-function buildUserPrompt(existingNames: string[], todayDa: string): string {
+function buildUserPrompt(existingNames: string[], todayDa: string, yesterdayDa: string): string {
   return [
-    `Dagens dato er ${todayDa}.`,
+    `Dagens dato er ${todayDa}. I går var ${yesterdayDa}.`,
     "",
     "Eksisterende virksomheder i databasen (find IKKE disse igen, søg efter helt nye):",
     existingNames.join(", "),
     "",
-    `Find op til ${PER_RUN_TARGET} nye danske virksomheder med en ægte nyhedshistorie offentliggjort i dag, ${todayDa} — ikke ældre nyheder — og lever fuld research på dem via submit_companies. Lever hellere færre end ${PER_RUN_TARGET}, hvis der ikke er nok ægte nyheder fra præcis i dag.`,
+    `Find op til ${PER_RUN_TARGET} nye danske virksomheder med en ægte nyhedshistorie offentliggjort i dag (${todayDa}) eller i går (${yesterdayDa}) — ikke ældre nyheder — og lever fuld research på dem via submit_companies. Lever hellere færre end ${PER_RUN_TARGET}, hvis der ikke er nok ægte nyheder fra de sidste to dage.`,
   ].join("\n");
 }
 
@@ -256,12 +256,20 @@ async function run(request: Request): Promise<Response> {
     return Response.json({ error: "ANTHROPIC_API_KEY er ikke sat" }, { status: 500 });
   }
 
-  const todayDa = new Intl.DateTimeFormat("da-DK", {
+  const now = new Date();
+  const dateFormatter = new Intl.DateTimeFormat("da-DK", {
     day: "numeric",
     month: "long",
     year: "numeric",
     timeZone: "Europe/Copenhagen",
-  }).format(new Date());
+  });
+  const todayDa = dateFormatter.format(now);
+  // Same-day-only news required verifying the exact publish date on every
+  // candidate's source page (not just trusting a search snippet), which
+  // burned most of a run's search budget rejecting near-misses. Widening
+  // to today-or-yesterday cuts that verification cost meaningfully while
+  // still keeping every lead genuinely fresh.
+  const yesterdayDa = dateFormatter.format(new Date(now.getTime() - 24 * 60 * 60 * 1000));
 
   const existing = await prisma.company.findMany({ select: { name: true } });
   const existingNames = existing.map((c) => c.name);
@@ -269,10 +277,12 @@ async function run(request: Request): Promise<Response> {
 
   const client = new Anthropic();
   const tools: Anthropic.Messages.ToolUnion[] = [
-    { type: "web_search_20260209", name: "web_search", max_uses: 8 },
+    { type: "web_search_20260209", name: "web_search", max_uses: 4 },
     SUBMIT_COMPANIES_TOOL,
   ];
-  const messages: Anthropic.MessageParam[] = [{ role: "user", content: buildUserPrompt(existingNames, todayDa) }];
+  const messages: Anthropic.MessageParam[] = [
+    { role: "user", content: buildUserPrompt(existingNames, todayDa, yesterdayDa) },
+  ];
 
   let submitted: { companies: SubmittedCompany[] } | null = null;
   let lastResponse: Anthropic.Message | null = null;
@@ -307,7 +317,7 @@ async function run(request: Request): Promise<Response> {
         {
           model: "claude-sonnet-5",
           max_tokens: 12000,
-          system: buildSystemPrompt(todayDa),
+          system: buildSystemPrompt(todayDa, yesterdayDa),
           thinking: { type: "disabled" },
           tools,
           messages,
