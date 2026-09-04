@@ -288,25 +288,39 @@ async function run(request: Request): Promise<Response> {
   const SOFT_DEADLINE_MS = 260_000;
 
   for (let i = 0; i < 30 && !submitted; i++) {
-    if (Date.now() - startedAt > SOFT_DEADLINE_MS) {
+    const remainingMs = SOFT_DEADLINE_MS - (Date.now() - startedAt);
+    if (remainingMs <= 0) {
       timedOut = true;
       break;
     }
     iterations++;
     let response: Anthropic.Message;
     try {
-      const stream = client.messages.stream({
-        model: "claude-sonnet-5",
-        max_tokens: 12000,
-        system: buildSystemPrompt(todayDa),
-        thinking: { type: "disabled" },
-        tools,
-        messages,
-      });
+      // The SDK's own default request timeout is 10 minutes — far beyond
+      // Vercel's 300s hard cap. Without capping it here, a single slow
+      // turn (the model doing several web searches back-to-back before
+      // pausing) can run past our own SOFT_DEADLINE_MS check above (which
+      // only runs *between* turns) and get killed opaquely by the
+      // platform instead of failing cleanly through our own catch below.
+      const stream = client.messages.stream(
+        {
+          model: "claude-sonnet-5",
+          max_tokens: 12000,
+          system: buildSystemPrompt(todayDa),
+          thinking: { type: "disabled" },
+          tools,
+          messages,
+        },
+        { timeout: remainingMs },
+      );
       response = await stream.finalMessage();
     } catch (error) {
       if (error instanceof Anthropic.RateLimitError) {
         return Response.json({ error: "Rate limited by Anthropic" }, { status: 429 });
+      }
+      if (error instanceof Anthropic.APIConnectionTimeoutError) {
+        timedOut = true;
+        break;
       }
       if (error instanceof Anthropic.APIError) {
         return Response.json({ error: `Anthropic API-fejl: ${error.message}` }, { status: 502 });
