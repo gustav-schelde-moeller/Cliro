@@ -296,12 +296,13 @@ async function run(request: Request): Promise<Response> {
     iterations++;
     let response: Anthropic.Message;
     try {
-      // The SDK's own default request timeout is 10 minutes — far beyond
-      // Vercel's 300s hard cap. Without capping it here, a single slow
-      // turn (the model doing several web searches back-to-back before
-      // pausing) can run past our own SOFT_DEADLINE_MS check above (which
-      // only runs *between* turns) and get killed opaquely by the
-      // platform instead of failing cleanly through our own catch below.
+      // The SDK's `timeout` request option only bounds time-to-first-byte
+      // (it wraps the fetch() call, which resolves as soon as headers
+      // arrive) — it does NOT bound how long a streamed response can keep
+      // sending SSE events afterward, which is where nearly all the time
+      // actually goes for a turn doing several web searches. An
+      // AbortSignal is the only thing that can cut off an in-flight
+      // stream, so that's what bounds the request to our real budget.
       const stream = client.messages.stream(
         {
           model: "claude-sonnet-5",
@@ -311,14 +312,14 @@ async function run(request: Request): Promise<Response> {
           tools,
           messages,
         },
-        { timeout: remainingMs },
+        { signal: AbortSignal.timeout(remainingMs) },
       );
       response = await stream.finalMessage();
     } catch (error) {
       if (error instanceof Anthropic.RateLimitError) {
         return Response.json({ error: "Rate limited by Anthropic" }, { status: 429 });
       }
-      if (error instanceof Anthropic.APIConnectionTimeoutError) {
+      if (error instanceof Anthropic.APIUserAbortError || error instanceof Anthropic.APIConnectionTimeoutError) {
         timedOut = true;
         break;
       }
