@@ -311,6 +311,16 @@ function isValidTier(key: string): key is Tier {
   return key === "hot" || key === "warm" || key === "cool";
 }
 
+function normalizeUrl(raw: string): string {
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    return `${u.hostname.toLowerCase()}${u.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return raw.trim().toLowerCase();
+  }
+}
+
 type TurnDiagnostics = {
   iterations: number;
   lastStopReason: string | null;
@@ -446,9 +456,17 @@ async function run(request: Request): Promise<Response> {
   const todayDa = dateFormatter.format(now);
   const yesterdayDa = dateFormatter.format(new Date(now.getTime() - 24 * 60 * 60 * 1000));
 
-  const existing = await prisma.company.findMany({ select: { name: true } });
+  const existing = await prisma.company.findMany({ select: { name: true, hook: true } });
   const existingNames = existing.map((c) => c.name);
   const seenNames = new Set(existingNames.map((n) => n.trim().toLowerCase()));
+  // Two independent runs can each land on a different company mentioned in
+  // the exact same news story (e.g. a retailer and its robot-tech
+  // supplier from one article) — name-only dedup doesn't catch that.
+  // Tracking the source URL too rejects a second company built on a story
+  // already used for an existing lead.
+  const seenHookUrls = new Set(
+    existing.map((c) => normalizeUrl((c.hook as { url?: string } | null)?.url ?? "")).filter(Boolean),
+  );
 
   const client = new Anthropic();
 
@@ -532,6 +550,10 @@ async function run(request: Request): Promise<Response> {
     const cKey = c.name.trim().toLowerCase();
     if (seenNames.has(cKey) || !isValidTier(c.tier.key)) {
       attempts.push({ candidate: candidate.name, diagnostics: verify.diagnostics, outcome: "invalid" });
+      continue;
+    }
+    if (seenHookUrls.has(normalizeUrl(c.hook.url))) {
+      attempts.push({ candidate: candidate.name, diagnostics: verify.diagnostics, outcome: "duplicate-source" });
       continue;
     }
 
