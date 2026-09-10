@@ -10,16 +10,21 @@ import type { Tier } from "@/lib/companies";
 // finish within this cap.
 export const maxDuration = 300;
 
-// Per-invocation target. Keep this low enough that a same-day research
-// sweep reliably finishes within maxDuration — 20 timed out, then 5 timed
-// out again even at output_config.effort "low", then 3 still hit a hard
-// FUNCTION_INVOCATION_TIMEOUT (504) at the full 300s (a same-day sweep is
-// inherently variable in duration, dominated by real web-search/fetch
-// round trips to verify publish dates, and 300s is a hard platform
-// ceiling that can't be raised). .github/workflows/daily-research.yml
-// schedules multiple runs per weekday so the daily total still reaches a
-// reasonable volume even at 1 company per run.
-const PER_RUN_TARGET = 1;
+// Each run inserts at most 1 company (the first discovery candidate that
+// verifies). .github/workflows/daily-research.yml schedules multiple runs
+// per weekday so the daily total still reaches a reasonable volume.
+//
+// Live testing (see git log on this file) showed the real bottleneck isn't
+// how much is asked for — it's that a single turn searching AND strictly
+// verifying a candidate's publish date AND writing full research kept
+// running past Vercel's 300s ceiling even for 1 company, regardless of
+// max_uses or output size. Splitting into two focused phases fixes this:
+// discovery is loose/fast (trust search snippets, find a few candidates),
+// verification is narrow (check ONE already-identified source instead of
+// searching broadly), so neither phase has to do everything at once.
+const DISCOVERY_CANDIDATES = 3;
+const DISCOVERY_MAX_USES = 4;
+const VERIFY_MAX_USES = 4;
 
 const TIER_LABELS: Record<Tier, string> = {
   hot: "Varm lead",
@@ -27,16 +32,54 @@ const TIER_LABELS: Record<Tier, string> = {
   cool: "Kan overvejes",
 };
 
+type Candidate = {
+  name: string;
+  website: string;
+  hookTitle: string;
+  hookUrl: string;
+  hookDateGuess: string;
+};
+
+const SUBMIT_CANDIDATES_TOOL: Anthropic.Tool = {
+  name: "submit_candidates",
+  description: `Submit up to ${DISCOVERY_CANDIDATES} candidate Danish companies with a news story that LOOKS like it's from today or yesterday, based on search results. This is a fast first pass — do not deeply verify the publish date yet, that happens in a later step. It's fine to submit fewer than ${DISCOVERY_CANDIDATES}, or none, if nothing plausible turns up.`,
+  strict: true,
+  input_schema: {
+    type: "object",
+    properties: {
+      candidates: {
+        type: "array",
+        description: `0 to ${DISCOVERY_CANDIDATES} candidates.`,
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Official company name." },
+            website: { type: "string", description: "Domain only, no protocol, e.g. example.dk" },
+            hookTitle: { type: "string", description: "Short title of the news story." },
+            hookUrl: { type: "string", description: "Direct source URL for the news." },
+            hookDateGuess: { type: "string", description: "Danish-formatted date the source appears to be from, e.g. '23. marts 2026'." },
+          },
+          required: ["name", "website", "hookTitle", "hookUrl", "hookDateGuess"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["candidates"],
+    additionalProperties: false,
+  },
+};
+
 const SUBMIT_COMPANIES_TOOL: Anthropic.Tool = {
   name: "submit_companies",
-  description: `Submit the final list of newly researched companies. Call this once, after you are done searching, with up to ${PER_RUN_TARGET} companies that are not already in the existing-companies list. It is fine — expected, even — to submit fewer than ${PER_RUN_TARGET} if that's all the real, recent (today-or-yesterday) news supports.`,
+  description:
+    "Submit the fully researched company if — and only if — you verified the source's publish date is genuinely today or yesterday. Call this once, as your last step. If verification fails (older date, or you can't confirm it), call this with an empty companies array instead of guessing.",
   strict: true,
   input_schema: {
     type: "object",
     properties: {
       companies: {
         type: "array",
-        description: `1 to ${PER_RUN_TARGET} companies. Strict-mode custom tools don't support minItems/maxItems, so this is enforced by instruction only.`,
+        description: "0 or 1 company. Strict-mode custom tools don't support minItems/maxItems, so this is enforced by instruction only.",
         items: {
           type: "object",
           properties: {
@@ -134,31 +177,7 @@ const SUBMIT_COMPANIES_TOOL: Anthropic.Tool = {
   },
 };
 
-function buildSystemPrompt(todayDa: string, yesterdayDa: string): string {
-  return `Du research danske virksomheder til DAVAI, et dansk produktionsselskab der laver reklamefilm og musikvideoer og bruger nyheder som anledning til at cold-calle virksomheder.
-
-Din opgave: find op til ${PER_RUN_TARGET} danske virksomheder med en ÆGTE, veldokumenteret nyhedshistorie offentliggjort i dag (${todayDa}) eller i går (${yesterdayDa}) — IKKE en ældre nyhed, uanset hvor god den er — og saml research om dem, som sælgere hos DAVAI kan bruge til at ringe op.
-
-Brug web_search grundigt, men fokuseret — du har et begrænset antal søgninger til rådighed, så brug dem effektivt frem for at afsøge udtømmende. Alt skal være ægte og efterprøveligt — find den faktiske nyhed med en rigtig kilde-URL og tjek at publiceringsdatoen på kilden faktisk er ${todayDa} eller ${yesterdayDa}, og forsøg at finde en navngiven, relevant kontaktperson (marketing/PR/kommunikation/CEO) med en kilde-URL eller LinkedIn-profil. Opfind ALDRIG navne, mailadresser eller nyheder. Hvis du ikke kan finde en navngiven kontakt, sæt contact.found=false og de øvrige contact-felter til null — gæt aldrig.
-
-Kriterier for de virksomheder du vælger:
-- Skal være et rigtigt dansk selskab (eller et internationalt selskab med markant dansk tilstedeværelse).
-- Må IKKE allerede findes i listen over eksisterende virksomheder, du får i brugerbeskeden — tjek navnet grundigt (stavevarianter, danske vs. engelske navne osv.).
-- Nyheden SKAL være fra i dag (${todayDa}) eller i går (${yesterdayDa}) — ikke ældre. Generel virksomhedsinfo eller ældre nyheder tæller ikke, uanset hvor relevante de ellers er.
-- Bland gerne brancher og virksomhedsstørrelser over tid; undgå at researche samme branche som sidst, hvis du kan se mønstre i den eksisterende liste.
-- Det er helt fint — og forventet på en stille nyhedsdag — at levere færre end ${PER_RUN_TARGET}. Fyld ALDRIG listen op med ældre nyheder for at nå et bestemt antal.
-
-Scoring (breakdown, summer til score):
-- contact (0-30): højere jo mere direkte/relevant kontaktperson du fandt (navngivet + direkte mail = højt).
-- news (0-35): højere jo friskere og mere konkret/handlingsorienteret nyheden er.
-- industry (0-20): højere for brancher der egner sig godt til videoproduktion (forbrugerbrands, oplevelser, mode, fødevarer, retail) end for meget tekniske B2B-brancher.
-- creative (0-15): højere jo mere oplagt en kreativ videoidé nyheden giver anledning til.
-dateRank er YYYYMM for hook.date. tier.key er "hot" for score ≥85, "warm" for 70-84, "cool" under 70 — sæt label til den tilsvarende danske tekst.
-
-Tone i "mail"-feltet: kort, uformel, konkret — nævn nyheden, præsentér DAVAI i én sætning, foreslå en konkret idé, og bed om en uforpligtende snak. Skriv i du-form. Signér "[dit navn], DAVAI".
-
-Eksempel på et fuldt, korrekt udfyldt element (brug dette KUN som stilistisk skabelon for felterne — kopiér ikke indholdet, og bemærk at eksemplets dato ikke er dagens dato):
-{
+const COMPANY_EXAMPLE_JSON = `{
   "name": "Sunset Boulevard",
   "website": "sunset-boulevard.dk",
   "industry": "Fødevarer",
@@ -190,19 +209,75 @@ Eksempel på et fuldt, korrekt udfyldt element (brug dette KUN som stilistisk sk
     "subject": "Tør du smage det, før du ved hvad det er?",
     "body": "Hej Cathrine\\n\\nVi faldt over jeres nye oksehjerte-burger og jeres genkendelige DNA med at turde eksperimentere med smagen – det er den slags historie, der er skabt til at blive udfordret på film.\\n\\nVi er DAVAI, og vi laver reklamefilm og musikvideoer. Konkret idé: et kort, sjovt socialt format, hvor vi udfordrer almindelige danskere på gaden til at gætte, hvad der er i burgeren, før de får sandheden at vide – i flere korte episoder til TikTok og Reels.\\n\\nHar du 20 minutter til en uforpligtende snak om idéen?\\n\\nBedste hilsner,\\n[dit navn], DAVAI"
   }
+}`;
+
+function buildDiscoverySystemPrompt(todayDa: string, yesterdayDa: string): string {
+  return `Du finder KANDIDATER til danske virksomheder til DAVAI, et dansk produktionsselskab der laver reklamefilm og musikvideoer og bruger nyheder som anledning til at cold-calle virksomheder.
+
+Dette er kun en hurtig, indledende research-fase — du skal IKKE bruge tid på at åbne og grundigt verificere hver kildes publiceringsdato endnu, det sker i et senere, separat trin. Stol på søgeresultaternes egne datoer/snippets for nu.
+
+Brug web_search fokuseret og find op til ${DISCOVERY_CANDIDATES} danske virksomheder, der ser ud til at have en nyhedshistorie fra i dag (${todayDa}) eller i går (${yesterdayDa}). For hver kandidat skal du angive navn, hjemmeside, en kort overskrift på nyheden, en direkte kilde-URL, og hvilken dato du umiddelbart tror nyheden er fra.
+
+Kriterier:
+- Skal være et rigtigt dansk selskab (eller et internationalt selskab med markant dansk tilstedeværelse).
+- Må IKKE allerede findes i listen over eksisterende virksomheder i brugerbeskeden.
+- Bland gerne brancher.
+- Det er helt fint at levere færre end ${DISCOVERY_CANDIDATES}, eller ingen, hvis intet virker friskt.
+
+Kald submit_candidates når du er færdig, som dit sidste skridt.`;
 }
 
-Når du er færdig med at søge og har fundet så mange solide, ægte kandidater med nyheder fra i dag eller i går som findes (op til ${PER_RUN_TARGET}), kald submit_companies med dem. Kald den kun én gang, som dit sidste skridt.`;
-}
-
-function buildUserPrompt(existingNames: string[], todayDa: string, yesterdayDa: string): string {
+function buildDiscoveryUserPrompt(existingNames: string[], todayDa: string, yesterdayDa: string): string {
   return [
     `Dagens dato er ${todayDa}. I går var ${yesterdayDa}.`,
     "",
     "Eksisterende virksomheder i databasen (find IKKE disse igen, søg efter helt nye):",
     existingNames.join(", "),
     "",
-    `Find op til ${PER_RUN_TARGET} nye danske virksomheder med en ægte nyhedshistorie offentliggjort i dag (${todayDa}) eller i går (${yesterdayDa}) — ikke ældre nyheder — og lever fuld research på dem via submit_companies. Lever hellere færre end ${PER_RUN_TARGET}, hvis der ikke er nok ægte nyheder fra de sidste to dage.`,
+    `Find op til ${DISCOVERY_CANDIDATES} kandidat-virksomheder med en nyhedshistorie der ser ud til at være fra i dag eller i går, og kald submit_candidates.`,
+  ].join("\n");
+}
+
+function buildVerifySystemPrompt(todayDa: string, yesterdayDa: string): string {
+  return `Du verificerer og færdig-researcher ÉN bestemt virksomhedskandidat til DAVAI, et dansk produktionsselskab der laver reklamefilm og musikvideoer og bruger nyheder som anledning til at cold-calle virksomheder.
+
+Din opgave, i rækkefølge:
+1. Brug web_fetch på kilde-URL'en du får i brugerbeskeden og BEKRÆFT at publiceringsdatoen faktisk er i dag (${todayDa}) eller i går (${yesterdayDa}). Hvis den er ældre, eller du ikke kan bekræfte det, skal du kalde submit_companies med en TOM companies-liste — gæt eller fyld ALDRIG på med en ældre nyhed.
+2. Hvis datoen bekræftes: forsøg at finde en navngiven, relevant kontaktperson (marketing/PR/kommunikation/CEO) med en kilde-URL eller LinkedIn-profil. Opfind ALDRIG navne, mailadresser eller nyheder. Hvis du ikke kan finde en navngiven kontakt, sæt contact.found=false og de øvrige contact-felter til null.
+3. Udfyld resten af felterne (industri, by, koordinater, breakdown, "existing", "social", "idea", "mail") baseret på det, du kan finde om virksomheden.
+
+Brug web_fetch og web_search fokuseret — du har et begrænset antal kald til at verificere datoen og finde en kontaktperson.
+
+Scoring (breakdown, summer til score):
+- contact (0-30): højere jo mere direkte/relevant kontaktperson du fandt (navngivet + direkte mail = højt).
+- news (0-35): højere jo friskere og mere konkret/handlingsorienteret nyheden er.
+- industry (0-20): højere for brancher der egner sig godt til videoproduktion (forbrugerbrands, oplevelser, mode, fødevarer, retail) end for meget tekniske B2B-brancher.
+- creative (0-15): højere jo mere oplagt en kreativ videoidé nyheden giver anledning til.
+dateRank er YYYYMM for hook.date. tier.key er "hot" for score ≥85, "warm" for 70-84, "cool" under 70 — sæt label til den tilsvarende danske tekst.
+
+Tone i "mail"-feltet: kort, uformel, konkret — nævn nyheden, præsentér DAVAI i én sætning, foreslå en konkret idé, og bed om en uforpligtende snak. Skriv i du-form. Signér "[dit navn], DAVAI".
+
+Eksempel på et fuldt, korrekt udfyldt element (brug dette KUN som stilistisk skabelon for felterne — kopiér ikke indholdet, og bemærk at eksemplets dato ikke er dagens dato):
+${COMPANY_EXAMPLE_JSON}
+
+Kald submit_companies med præcis 0 eller 1 virksomhed, som dit sidste skridt.`;
+}
+
+function buildVerifyUserPrompt(candidate: Candidate, existingNames: string[], todayDa: string, yesterdayDa: string): string {
+  return [
+    `Dagens dato er ${todayDa}. I går var ${yesterdayDa}.`,
+    "",
+    "Eksisterende virksomheder i databasen (afvis kandidaten hvis den allerede findes her):",
+    existingNames.join(", "),
+    "",
+    "Kandidat at verificere og færdig-researche:",
+    `Navn: ${candidate.name}`,
+    `Hjemmeside: ${candidate.website}`,
+    `Formodet nyhed: ${candidate.hookTitle}`,
+    `Kilde-URL: ${candidate.hookUrl}`,
+    `Formodet dato: ${candidate.hookDateGuess}`,
+    "",
+    "Bekræft datoen på selve kilden, find en kontaktperson, og kald submit_companies.",
   ].join("\n");
 }
 
@@ -236,6 +311,111 @@ function isValidTier(key: string): key is Tier {
   return key === "hot" || key === "warm" || key === "cool";
 }
 
+type TurnDiagnostics = {
+  iterations: number;
+  lastStopReason: string | null;
+  finalText: string | null;
+};
+
+type TurnResult<T> =
+  | { kind: "success"; result: T; diagnostics: TurnDiagnostics }
+  | { kind: "timedOut"; diagnostics: TurnDiagnostics }
+  | { kind: "noResult"; diagnostics: TurnDiagnostics }
+  | { kind: "errorResponse"; response: Response };
+
+// Runs one Claude "turn" (which may itself span several pause_turn round
+// trips) until it calls `toolName` or gives up. Shared by the discovery and
+// verification phases so both get the same deadline handling and pause_turn
+// plumbing without duplicating it.
+async function runToolLoop<T>(
+  client: Anthropic,
+  opts: {
+    system: string;
+    initialMessage: string;
+    tools: Anthropic.Messages.ToolUnion[];
+    toolName: string;
+    maxTokens: number;
+    deadlineAt: number;
+  },
+): Promise<TurnResult<T>> {
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: opts.initialMessage }];
+  let lastResponse: Anthropic.Message | null = null;
+  let iterations = 0;
+
+  for (let i = 0; i < 30; i++) {
+    const remainingMs = opts.deadlineAt - Date.now();
+    if (remainingMs <= 0) {
+      return { kind: "timedOut", diagnostics: diagnosticsFrom(iterations, lastResponse) };
+    }
+    iterations++;
+    let response: Anthropic.Message;
+    try {
+      // AbortSignal, not the `timeout` request option — `timeout` only
+      // bounds time-to-first-byte (it wraps fetch(), which resolves once
+      // headers arrive), not how long a streamed response can keep sending
+      // SSE events afterward, which is where nearly all the time actually
+      // goes for a turn doing web searches.
+      const stream = client.messages.stream(
+        {
+          model: "claude-sonnet-5",
+          max_tokens: opts.maxTokens,
+          system: opts.system,
+          thinking: { type: "disabled" },
+          tools: opts.tools,
+          messages,
+        },
+        { signal: AbortSignal.timeout(remainingMs) },
+      );
+      response = await stream.finalMessage();
+    } catch (error) {
+      if (error instanceof Anthropic.RateLimitError) {
+        return { kind: "errorResponse", response: Response.json({ error: "Rate limited by Anthropic" }, { status: 429 }) };
+      }
+      if (error instanceof Anthropic.APIUserAbortError || error instanceof Anthropic.APIConnectionTimeoutError) {
+        return { kind: "timedOut", diagnostics: diagnosticsFrom(iterations, lastResponse) };
+      }
+      if (error instanceof Anthropic.APIError) {
+        return {
+          kind: "errorResponse",
+          response: Response.json({ error: `Anthropic API-fejl: ${error.message}` }, { status: 502 }),
+        };
+      }
+      throw error;
+    }
+
+    lastResponse = response;
+
+    if (response.stop_reason === "pause_turn") {
+      messages.push({ role: "assistant", content: response.content });
+      continue;
+    }
+
+    if (response.stop_reason === "tool_use") {
+      const toolUse = response.content.find(
+        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === opts.toolName,
+      );
+      if (toolUse) {
+        return { kind: "success", result: toolUse.input as T, diagnostics: diagnosticsFrom(iterations, lastResponse) };
+      }
+      messages.push({ role: "assistant", content: response.content });
+      continue;
+    }
+
+    break;
+  }
+
+  return { kind: "noResult", diagnostics: diagnosticsFrom(iterations, lastResponse) };
+}
+
+function diagnosticsFrom(iterations: number, lastResponse: Anthropic.Message | null): TurnDiagnostics {
+  const finalText =
+    lastResponse?.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("\n") || null;
+  return { iterations, lastStopReason: lastResponse?.stop_reason ?? null, finalText };
+}
+
 export async function GET(request: Request) {
   try {
     return await run(request);
@@ -264,11 +444,6 @@ async function run(request: Request): Promise<Response> {
     timeZone: "Europe/Copenhagen",
   });
   const todayDa = dateFormatter.format(now);
-  // Same-day-only news required verifying the exact publish date on every
-  // candidate's source page (not just trusting a search snippet), which
-  // burned most of a run's search budget rejecting near-misses. Widening
-  // to today-or-yesterday cuts that verification cost meaningfully while
-  // still keeping every lead genuinely fresh.
   const yesterdayDa = dateFormatter.format(new Date(now.getTime() - 24 * 60 * 60 * 1000));
 
   const existing = await prisma.company.findMany({ select: { name: true } });
@@ -276,120 +451,87 @@ async function run(request: Request): Promise<Response> {
   const seenNames = new Set(existingNames.map((n) => n.trim().toLowerCase()));
 
   const client = new Anthropic();
-  const tools: Anthropic.Messages.ToolUnion[] = [
-    { type: "web_search_20260209", name: "web_search", max_uses: 4 },
-    SUBMIT_COMPANIES_TOOL,
-  ];
-  const messages: Anthropic.MessageParam[] = [
-    { role: "user", content: buildUserPrompt(existingNames, todayDa, yesterdayDa) },
-  ];
-
-  let submitted: { companies: SubmittedCompany[] } | null = null;
-  let lastResponse: Anthropic.Message | null = null;
-  let iterations = 0;
-  let timedOut = false;
 
   // Vercel Hobby hard-kills the whole function at 300s (maxDuration) with
   // an opaque FUNCTION_INVOCATION_TIMEOUT / 504 — no chance for our own
-  // catch block to run or return diagnostics. Bail out of the loop with a
-  // clean response once we're within one round trip of that ceiling
-  // instead of risking the platform killing us mid-request.
+  // code to run or return diagnostics. Everything below stays inside this
+  // soft deadline so we always return a clean response instead.
   const startedAt = Date.now();
-  const SOFT_DEADLINE_MS = 260_000;
+  const overallDeadlineAt = startedAt + 260_000;
+  const discoveryDeadlineAt = Math.min(overallDeadlineAt, startedAt + 100_000);
 
-  for (let i = 0; i < 30 && !submitted; i++) {
-    const remainingMs = SOFT_DEADLINE_MS - (Date.now() - startedAt);
-    if (remainingMs <= 0) {
-      timedOut = true;
-      break;
-    }
-    iterations++;
-    let response: Anthropic.Message;
-    try {
-      // The SDK's `timeout` request option only bounds time-to-first-byte
-      // (it wraps the fetch() call, which resolves as soon as headers
-      // arrive) — it does NOT bound how long a streamed response can keep
-      // sending SSE events afterward, which is where nearly all the time
-      // actually goes for a turn doing several web searches. An
-      // AbortSignal is the only thing that can cut off an in-flight
-      // stream, so that's what bounds the request to our real budget.
-      const stream = client.messages.stream(
-        {
-          model: "claude-sonnet-5",
-          max_tokens: 12000,
-          system: buildSystemPrompt(todayDa, yesterdayDa),
-          thinking: { type: "disabled" },
-          tools,
-          messages,
-        },
-        { signal: AbortSignal.timeout(remainingMs) },
-      );
-      response = await stream.finalMessage();
-    } catch (error) {
-      if (error instanceof Anthropic.RateLimitError) {
-        return Response.json({ error: "Rate limited by Anthropic" }, { status: 429 });
-      }
-      if (error instanceof Anthropic.APIUserAbortError || error instanceof Anthropic.APIConnectionTimeoutError) {
-        timedOut = true;
-        break;
-      }
-      if (error instanceof Anthropic.APIError) {
-        return Response.json({ error: `Anthropic API-fejl: ${error.message}` }, { status: 502 });
-      }
-      throw error;
-    }
+  const discovery = await runToolLoop<{ candidates: Candidate[] }>(client, {
+    system: buildDiscoverySystemPrompt(todayDa, yesterdayDa),
+    initialMessage: buildDiscoveryUserPrompt(existingNames, todayDa, yesterdayDa),
+    // The `_20260209` "dynamic filtering" web_search variant runs its own
+    // code_execution sandbox under the hood — each bash round trip it uses
+    // costs 20-30+ seconds, which is what actually blew every earlier
+    // attempt past Vercel's 300s ceiling (confirmed by comparing raw
+    // stream events between the two tool versions — same task, 117s vs
+    // 18.5s). The basic `_20250305` variant does plain search with no
+    // hidden sandbox and is what makes this loose discovery pass fast.
+    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: DISCOVERY_MAX_USES }, SUBMIT_CANDIDATES_TOOL],
+    toolName: "submit_candidates",
+    maxTokens: 2000,
+    deadlineAt: discoveryDeadlineAt,
+  });
 
-    lastResponse = response;
+  if (discovery.kind === "errorResponse") return discovery.response;
 
-    if (response.stop_reason === "pause_turn") {
-      messages.push({ role: "assistant", content: response.content });
-      continue;
-    }
-
-    if (response.stop_reason === "tool_use") {
-      const toolUse = response.content.find(
-        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "submit_companies",
-      );
-      if (toolUse) {
-        submitted = toolUse.input as { companies: SubmittedCompany[] };
-        break;
-      }
-      messages.push({ role: "assistant", content: response.content });
-      continue;
-    }
-
-    break;
-  }
-
-  if (!submitted || submitted.companies.length === 0) {
-    const finalText = lastResponse?.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n") || null;
+  if (discovery.kind !== "success" || discovery.result.candidates.length === 0) {
     return Response.json(
       {
-        error: timedOut
-          ? "Nåede blødt tidsloft før Claude leverede et resultat — stoppet før Vercel ville have dræbt funktionen"
-          : "Claude leverede ikke et struktureret resultat",
-        diagnostics: {
-          timedOut,
-          elapsedMs: Date.now() - startedAt,
-          iterations,
-          lastStopReason: lastResponse?.stop_reason ?? null,
-          finalText,
-        },
+        error:
+          discovery.kind === "timedOut"
+            ? "Nåede blødt tidsloft under kandidat-søgning"
+            : "Fandt ingen kandidat-virksomheder",
+        phase: "discovery",
+        diagnostics: discovery.diagnostics,
       },
       { status: 502 },
     );
   }
 
-  const inserted: string[] = [];
-  const skipped: string[] = [];
+  const attempts: Array<{ candidate: string; diagnostics: TurnDiagnostics | null; outcome: string }> = [];
 
-  for (const c of submitted.companies.slice(0, PER_RUN_TARGET)) {
-    const key = c.name.trim().toLowerCase();
-    if (seenNames.has(key) || !isValidTier(c.tier.key)) {
-      skipped.push(c.name);
+  for (const candidate of discovery.result.candidates.slice(0, DISCOVERY_CANDIDATES)) {
+    if (Date.now() >= overallDeadlineAt) break;
+
+    const key = candidate.name.trim().toLowerCase();
+    if (seenNames.has(key)) {
+      attempts.push({ candidate: candidate.name, diagnostics: null, outcome: "already-known" });
+      continue;
+    }
+
+    const verify = await runToolLoop<{ companies: SubmittedCompany[] }>(client, {
+      system: buildVerifySystemPrompt(todayDa, yesterdayDa),
+      initialMessage: buildVerifyUserPrompt(candidate, existingNames, todayDa, yesterdayDa),
+      // web_fetch can only fetch URLs already present in the conversation —
+      // buildVerifyUserPrompt includes candidate.hookUrl as plain text, so
+      // the model can fetch that exact page directly instead of searching
+      // for it again. Same basic (non-dynamic-filtering) tool family as
+      // discovery, for the same reason: no hidden code_execution sandbox.
+      tools: [
+        { type: "web_search_20250305", name: "web_search", max_uses: VERIFY_MAX_USES },
+        { type: "web_fetch_20250910", name: "web_fetch", max_uses: 2 },
+        SUBMIT_COMPANIES_TOOL,
+      ],
+      toolName: "submit_companies",
+      maxTokens: 6000,
+      deadlineAt: overallDeadlineAt,
+    });
+
+    if (verify.kind === "errorResponse") return verify.response;
+
+    if (verify.kind !== "success" || verify.result.companies.length === 0) {
+      attempts.push({ candidate: candidate.name, diagnostics: verify.diagnostics, outcome: verify.kind });
+      continue;
+    }
+
+    const c = verify.result.companies[0];
+    const cKey = c.name.trim().toLowerCase();
+    if (seenNames.has(cKey) || !isValidTier(c.tier.key)) {
+      attempts.push({ candidate: candidate.name, diagnostics: verify.diagnostics, outcome: "invalid" });
       continue;
     }
 
@@ -414,9 +556,17 @@ async function run(request: Request): Promise<Response> {
         mail: c.mail,
       },
     });
-    seenNames.add(key);
-    inserted.push(c.name);
+
+    return Response.json({ inserted: [c.name], attempts });
   }
 
-  return Response.json({ inserted, skipped });
+  return Response.json(
+    {
+      error: "Ingen af kandidaterne kunne verificeres inden for tidsbudgettet",
+      phase: "verify",
+      candidates: discovery.result.candidates.map((c) => c.name),
+      attempts,
+    },
+    { status: 502 },
+  );
 }
