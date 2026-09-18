@@ -1,8 +1,9 @@
 "use client";
 
-import { STAGE_LABELS, type CvrCompanyRow } from "./CvrBrowser";
-
-const STAGE_ORDER = ["kontaktet", "svar", "mode", "pipeline"] as const;
+import { useState } from "react";
+import { STATUS_DEFS, statusLabel } from "@/lib/status";
+import { ListMenu, type TeamListOption } from "./ListMenu";
+import type { CvrCompanyRow } from "./CvrBrowser";
 
 function formatKr(n: number | null): string {
   if (n == null) return "—";
@@ -11,17 +12,29 @@ function formatKr(n: number | null): string {
 
 export function CvrDrawer({
   company,
+  myName,
+  teamLists,
   onClose,
   onToggleStar,
-  onSetStage,
+  onSetStatus,
+  onAssign,
+  onRelease,
+  onToggleList,
+  onCreateList,
 }: {
   company: CvrCompanyRow;
+  myName: string;
+  teamLists: TeamListOption[];
   onClose: () => void;
   onToggleStar: () => void;
-  onSetStage: (stage: string | null) => void;
+  onSetStatus: (status: string) => void;
+  onAssign: () => void;
+  onRelease: () => void;
+  onToggleList: (listId: string) => void;
+  onCreateList: (name: string) => void;
 }) {
-  const starred = company.lead?.starred ?? false;
-  const stage = company.lead?.stage ?? null;
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const pipeline = company.pipeline ?? { status: "new", assigneeId: null, assigneeName: null };
   const address = [company.vejnavn, company.husnummer].filter(Boolean).join(" ");
 
   return (
@@ -35,9 +48,23 @@ export function CvrDrawer({
             <span className="tag">CVR {company.cvrNummer}</span>
           </div>
           <div className="drawer-head-actions">
-            <button type="button" className={`star-btn drawer-star${starred ? " starred" : ""}`} aria-label="Stjernemarkér" title="Stjernemarkér" onClick={onToggleStar}>
-              {starred ? "★" : "☆"}
+            <button
+              type="button"
+              className={`star-btn drawer-star${company.starred ? " starred" : ""}`}
+              aria-label="Stjernemarkér"
+              title="Stjernemarkér"
+              onClick={onToggleStar}
+            >
+              {company.starred ? "★" : "☆"}
             </button>
+            <ListMenu
+              className="drawer-list-menu"
+              companyName={company.navn || `CVR ${company.cvrNummer}`}
+              teamLists={teamLists}
+              listIds={new Set(company.listIds)}
+              onToggleList={onToggleList}
+              onCreateList={onCreateList}
+            />
             <button type="button" className="drawer-close" aria-label="Luk" onClick={onClose}>
               <svg viewBox="0 0 24 24" fill="none" width={16} height={16}>
                 <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -46,18 +73,47 @@ export function CvrDrawer({
           </div>
         </div>
         <div className="drawer-body">
-          <div className="section-label">Status</div>
+          <div className="section-label">Pipeline</div>
           <div className="drawer-pipeline">
-            <div className="filter-row">
-              <button type="button" className={`chip${stage === null ? " active" : ""}`} onClick={() => onSetStage(null)}>
-                Ingen status
+            <div className="status-menu">
+              <button type="button" className="status-pill" onClick={() => setStatusMenuOpen((v) => !v)}>
+                {statusLabel(pipeline.status)} ▾
               </button>
-              {STAGE_ORDER.map((s) => (
-                <button key={s} type="button" className={`chip${stage === s ? " tier-active" : ""}`} onClick={() => onSetStage(s)}>
-                  {STAGE_LABELS[s]}
-                </button>
-              ))}
+              {statusMenuOpen ? (
+                <div className="status-dropdown" style={{ display: "flex" }}>
+                  {STATUS_DEFS.map((s) => (
+                    <button
+                      key={s.key}
+                      type="button"
+                      className="status-opt"
+                      onClick={() => {
+                        setStatusMenuOpen(false);
+                        onSetStatus(s.key);
+                      }}
+                    >
+                      <span className={`status-dot ${s.key}`} />
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
+          </div>
+          <div className="drawer-assign">
+            {pipeline.assigneeName ? (
+              <>
+                <span className="assignee-chip">👤 Tildelt: {pipeline.assigneeName}</span>
+                {pipeline.assigneeName === myName ? (
+                  <button type="button" className="btn" onClick={onRelease}>
+                    Frigiv
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <button type="button" className="btn primary" onClick={onAssign}>
+                Tildel til mig
+              </button>
+            )}
           </div>
 
           <div className="section-label">Registreringsoplysninger</div>
@@ -68,13 +124,19 @@ export function CvrDrawer({
               {company.postnummer ? `, ${company.postnummer} ${company.postdistrikt ?? ""}` : ""}
               <br />
               {company.kommunenavn ?? "—"} · {company.region ?? "Ukendt region"}
+              {company.distanceKm != null ? ` · ${Math.round(company.distanceKm)} km fra dig` : ""}
             </div>
           </div>
           <div className="info-card">
             <div className="k">Kontakt</div>
             <div className="v">
               {company.email ?? "Ingen mail registreret"}
-              {company.telefon ? <>{" · "}{company.telefon}</> : null}
+              {company.telefon ? (
+                <>
+                  {" · "}
+                  {company.telefon}
+                </>
+              ) : null}
             </div>
           </div>
           <div className="info-card">
@@ -94,10 +156,7 @@ export function CvrDrawer({
             <div className="bd-row">
               <span>Købekraft</span>
               <div className="bd-track">
-                <div
-                  className="bd-fill"
-                  style={{ width: `${company.koebekraftScore ?? 0}%`, background: "var(--star)" }}
-                />
+                <div className="bd-fill" style={{ width: `${company.koebekraftScore ?? 0}%`, background: "var(--star)" }} />
               </div>
               <b>{company.koebekraftScore ?? "—"}</b>
             </div>

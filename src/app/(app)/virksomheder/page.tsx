@@ -16,8 +16,8 @@ export default async function VirksomhederPage() {
     getCompanies(),
     getTeamLeadsMap(teamId),
     getUserStars(session.user.id),
-    getTeamLists(teamId),
-    getCompanyListMemberships(teamId),
+    getTeamLists(teamId, session.user.id),
+    getCompanyListMemberships(teamId, session.user.id),
   ]);
 
   const leadsPlain = Object.fromEntries(leadsMap);

@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const params = Object.fromEntries(new URL(request.url).searchParams);
+  const params = { ...Object.fromEntries(new URL(request.url).searchParams), userId: session.user.id };
 
   // Each facet's own filter is excluded from its own count query (standard
   // faceted-search behaviour), but every other active filter still applies —

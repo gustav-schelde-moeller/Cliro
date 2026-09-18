@@ -193,7 +193,7 @@ export function VirksomhederView({
         </button>
       </div>
 
-      {mode === "cvr" ? <CvrBrowser /> : (
+      {mode === "cvr" ? <CvrBrowser teamId={teamId} myName={myName} initialTeamLists={teamLists} /> : (
       <>
       <div className="toolbar">
         <div className="search-wrap">

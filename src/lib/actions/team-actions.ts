@@ -85,6 +85,10 @@ export async function leaveTeamAction(teamId: string) {
 
   await prisma.teamMember.delete({ where: { teamId_userId: { teamId, userId: user.id } } });
   await prisma.lead.updateMany({ where: { teamId, assigneeId: user.id }, data: { assigneeId: null } });
+  await prisma.cvrTeamLead.updateMany({ where: { teamId, assigneeId: user.id }, data: { assigneeId: null } });
+  // A departing member's private lists would otherwise become invisible to
+  // everyone forever — surface them back to the team instead of losing them.
+  await prisma.companyList.updateMany({ where: { teamId, createdBy: user.id, isPrivate: true }, data: { isPrivate: false } });
   await clearActiveTeamId();
   redirect("/");
 }
@@ -150,6 +154,8 @@ export async function removeMemberAction(teamId: string, targetUserId: string) {
   const target = await prisma.user.findUnique({ where: { id: targetUserId } });
   await prisma.teamMember.delete({ where: { teamId_userId: { teamId, userId: targetUserId } } });
   await prisma.lead.updateMany({ where: { teamId, assigneeId: targetUserId }, data: { assigneeId: null } });
+  await prisma.cvrTeamLead.updateMany({ where: { teamId, assigneeId: targetUserId }, data: { assigneeId: null } });
+  await prisma.companyList.updateMany({ where: { teamId, createdBy: targetUserId, isPrivate: true }, data: { isPrivate: false } });
   await prisma.activityLog.create({
     data: {
       teamId,

@@ -4,6 +4,7 @@ export const SORT_WHITELIST = new Set([
   "navn",
   "brancheTekst",
   "kommunenavn",
+  "region",
   "postnummer",
   "produktionsenhederAntal",
   "employees",
@@ -12,7 +13,9 @@ export const SORT_WHITELIST = new Set([
 
 // Denmark's 5 administrative regions, by kommunekode. Verbatim port of the
 // handed-off cvr-tool's REGIONS table (verified against the actual
-// kommunekode/kommunenavn pairs present in the data).
+// kommunekode/kommunenavn pairs present in the data). CvrCompany.region is
+// a persisted backfill of this same lookup (scripts/backfill-cvr-derived-fields.mjs)
+// so it can be sorted/filtered as a real indexed column.
 export const REGIONS: Record<string, string[]> = {
   Hovedstaden: ["101", "147", "151", "153", "155", "157", "159", "161", "163", "165", "167", "169", "173", "175", "183", "185", "187", "190", "201", "210", "217", "219", "223", "230", "240", "250", "260", "270", "400", "411"],
   Sjælland: ["253", "259", "265", "269", "306", "316", "320", "326", "329", "330", "336", "340", "350", "360", "370", "376", "390"],
@@ -25,13 +28,6 @@ export const REGION_BY_KOMMUNEKODE = new Map<string, string>();
 for (const [region, kommuner] of Object.entries(REGIONS)) {
   for (const k of kommuner) REGION_BY_KOMMUNEKODE.set(k, region);
 }
-
-export const STAGE_LABELS: Record<string, string> = {
-  kontaktet: "Kontaktet",
-  svar: "Svar",
-  mode: "Møde",
-  pipeline: "Pipeline",
-};
 
 function sizeBucketWhere(size: string): Prisma.CvrCompanyWhereInput | null {
   if (size === "small") return { employees: { gte: 10, lt: 50 } };
@@ -51,14 +47,32 @@ function koebekraftBucketWhere(bucket: string): Prisma.CvrCompanyWhereInput | nu
   return null;
 }
 
+// Approximate radius filter via a lat/lng bounding box — the same tier of
+// "approximate" the postnummer-centroid coordinates themselves already are,
+// so exact-radius precision (PostGIS, a real geo index) would be spending
+// effort on precision the data can't back up anyway.
+function distanceBoundingBoxWhere(lat: number, lng: number, maxDistanceKm: number): Prisma.CvrCompanyWhereInput {
+  const latDelta = maxDistanceKm / 111;
+  const lngDelta = maxDistanceKm / (111 * Math.cos((lat * Math.PI) / 180));
+  return {
+    lat: { gte: lat - latDelta, lte: lat + latDelta },
+    lng: { gte: lng - lngDelta, lte: lng + lngDelta },
+  };
+}
+
 export type CvrFilterParams = {
   q?: string | null;
   branche?: string | null;
   region?: string | null;
   size?: string | null;
   koebekraft?: string | null;
-  stage?: string | null;
   starred?: string | null;
+  lat?: string | null;
+  lng?: string | null;
+  maxDistanceKm?: string | null;
+  // Set server-side from the session — never trust a query-string value for
+  // this, since it scopes the private "my stars" filter.
+  userId?: string;
 };
 
 // Builds a Prisma where-clause from the current filter params. `exclude`
@@ -85,7 +99,7 @@ export function buildWhere(params: CvrFilterParams, exclude: Set<string> = new S
 
   const region = params.region;
   if (region && !exclude.has("region")) {
-    AND.push({ kommunekode: { in: REGIONS[region] || [] } });
+    AND.push({ region });
   }
 
   const size = params.size;
@@ -96,14 +110,16 @@ export function buildWhere(params: CvrFilterParams, exclude: Set<string> = new S
   const koebekraftWhere = koebekraft && !exclude.has("koebekraft") ? koebekraftBucketWhere(koebekraft) : null;
   if (koebekraftWhere) AND.push(koebekraftWhere);
 
-  const stage = params.stage;
-  if (stage && !exclude.has("stage")) {
-    AND.push(stage === "none" ? { lead: null } : { lead: { stage } });
+  const starred = params.starred;
+  if (starred && !exclude.has("starred") && params.userId) {
+    AND.push({ stars: { some: { userId: params.userId } } });
   }
 
-  const starred = params.starred;
-  if (starred && !exclude.has("starred")) {
-    AND.push({ lead: { starred: true } });
+  const lat = params.lat ? Number(params.lat) : null;
+  const lng = params.lng ? Number(params.lng) : null;
+  const maxDistanceKm = params.maxDistanceKm ? Number(params.maxDistanceKm) : null;
+  if (lat != null && lng != null && maxDistanceKm != null && !exclude.has("distance")) {
+    AND.push(distanceBoundingBoxWhere(lat, lng, maxDistanceKm));
   }
 
   return { AND };

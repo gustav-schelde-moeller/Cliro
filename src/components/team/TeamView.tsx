@@ -8,6 +8,7 @@ import { statusLabel } from "@/lib/status";
 import { inviteEmailAction, removeMemberAction, setRoleAction, type ActionResult } from "@/lib/actions/team-actions";
 
 type MemberLead = { id: number; name: string; industry: string; status: string };
+type MemberCvrLead = { cvrNummer: string; name: string; industry: string; status: string };
 type Member = {
   userId: string;
   name: string;
@@ -17,8 +18,14 @@ type Member = {
   isOwner: boolean;
   stats: { total: number; won: number; meeting: number };
   leads: MemberLead[];
+  cvrLeads: MemberCvrLead[];
 };
 type ActivityItem = { id: string; ts: string; who: string; action: string; company: string | null };
+type PublicListItem = { id: string; name: string; createdAt: string; createdByName: string | null; itemCount: number };
+
+function formatDate(iso: string): string {
+  return new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
+}
 
 function timeAgo(iso: string): string {
   const diff = Math.max(0, Date.now() - new Date(iso).getTime());
@@ -41,6 +48,7 @@ export function TeamView({
   myUserId,
   members,
   activity,
+  publicLists,
 }: {
   teamId: string;
   teamName: string;
@@ -51,6 +59,7 @@ export function TeamView({
   myName: string;
   members: Member[];
   activity: ActivityItem[];
+  publicLists: PublicListItem[];
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -219,9 +228,9 @@ export function TeamView({
               <div className="member-block-head">
                 <Avatar name={m.name} avatarDataUrl={m.avatarDataUrl} size="sm" />
                 <b>{m.name}</b>
-                <span className="tag">{m.leads.length} tildelt</span>
+                <span className="tag">{m.leads.length + m.cvrLeads.length} tildelt</span>
               </div>
-              {m.leads.length > 0 ? (
+              {m.leads.length > 0 || m.cvrLeads.length > 0 ? (
                 <div className="member-leads">
                   {m.leads.map((l) => (
                     <div className="member-lead-row" key={l.id}>
@@ -232,12 +241,47 @@ export function TeamView({
                       <span className="tag">{l.industry}</span>
                     </div>
                   ))}
+                  {m.cvrLeads.map((l) => (
+                    <div className="member-lead-row" key={l.cvrNummer}>
+                      <span className="status-pill" data-status={l.status}>
+                        {statusLabel(l.status)}
+                      </span>
+                      <span className="tag">CVR</span>
+                      <span>{l.name}</span>
+                      <span className="tag">{l.industry}</span>
+                    </div>
+                  ))}
                 </div>
               ) : null}
             </div>
           ))
         )}
       </div>
+
+      <div className="panel-card" style={{ marginTop: 16 }}>
+        <h3>Alle team-lister</h3>
+        {publicLists.length === 0 ? (
+          <div className="dash-empty">Ingen synlige lister endnu. Opret en på Lister-siden og gør den synlig for teamet.</div>
+        ) : (
+          publicLists.map((l, i) => (
+            <div className="panel-card list-card-anim" style={{ marginTop: i === 0 ? 0 : 10, animationDelay: `${Math.min(i, 8) * 40}ms` }} key={l.id}>
+              <div className="list-header-row">
+                <div className="list-header-title">
+                  <h3 className="list-name-link">{l.name}</h3>
+                  <span className="tag">
+                    {l.itemCount} {l.itemCount === 1 ? "virksomhed" : "virksomheder"}
+                  </span>
+                </div>
+              </div>
+              <div className="distance-note list-created-note">
+                {l.createdByName ? `Oprettet af ${l.createdByName} · ` : ""}
+                {formatDate(l.createdAt)}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       <div className="footer-note">Den første person i et team er automatisk ejer og kan gøre andre til admin herfra.</div>
     </section>
   );

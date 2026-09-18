@@ -2,14 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
+import { STATUS_DEFS, statusLabel } from "@/lib/status";
 import { CvrDrawer } from "./CvrDrawer";
+import { ListMenu, type TeamListOption } from "./ListMenu";
+import { useCvrRowMutations } from "./useCvrRowMutations";
 
-export const STAGE_LABELS: Record<string, string> = {
-  kontaktet: "Kontaktet",
-  svar: "Svar",
-  mode: "Møde",
-  pipeline: "Pipeline",
-};
+export type CvrPipelineState = { status: string; assigneeId: string | null; assigneeName: string | null };
 
 export type CvrCompanyRow = {
   cvrNummer: string;
@@ -34,7 +32,10 @@ export type CvrCompanyRow = {
   likvideBeholdninger: number | null;
   regnskabAar: number | null;
   koebekraftScore: number | null;
-  lead: { stage: string | null; notes: string | null; lastContacted: string | null; starred: boolean } | null;
+  pipeline: CvrPipelineState | null;
+  starred: boolean;
+  listIds: string[];
+  distanceKm: number | null;
 };
 
 type BrancheFacet = { label: string; kodes: string[]; n: number };
@@ -47,6 +48,7 @@ const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: "koebekraftScore", label: "Købekraft (høj → lav)" },
   { value: "employees", label: "Medarbejdere (flest)" },
   { value: "brancheTekst", label: "Branche" },
+  { value: "region", label: "Region" },
 ];
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -58,7 +60,15 @@ function useDebounced<T>(value: T, ms: number): T {
   return debounced;
 }
 
-export function CvrBrowser() {
+export function CvrBrowser({
+  teamId,
+  myName,
+  initialTeamLists,
+}: {
+  teamId: string;
+  myName: string;
+  initialTeamLists: TeamListOption[];
+}) {
   const { showToast } = useToast();
   const [search, setSearch] = useState("");
   const [branche, setBranche] = useState("");
@@ -73,13 +83,27 @@ export function CvrBrowser() {
   const [rows, setRows] = useState<CvrCompanyRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selected, setSelected] = useState<CvrCompanyRow | null>(null);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const activeFilterCount = (branche ? 1 : 0) + (region ? 1 : 0) + (size ? 1 : 0) + (koebekraft ? 1 : 0);
+  const [openStatusFor, setOpenStatusFor] = useState<string | null>(null);
+  const [myLocation, setMyLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [maxDistance, setMaxDistance] = useState<number | null>(null);
+  const [locating, setLocating] = useState(false);
+
+  const { teamLists, handleSetStatus, handleAssign, handleRelease, handleToggleStar, handleToggleList, handleCreateList } =
+    useCvrRowMutations({ teamId, myName, initialTeamLists, setRows, setSelected });
+
+  const activeFilterCount =
+    (branche ? 1 : 0) + (region ? 1 : 0) + (size ? 1 : 0) + (koebekraft ? 1 : 0) + (starredOnly ? 1 : 0) + (myLocation && maxDistance != null ? 1 : 0);
   const debouncedSearch = useDebounced(search, 350);
   const requestId = useRef(0);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const queryString = useMemo(() => {
+  // Split so scrolling to the next page (which only changes `page`) doesn't
+  // needlessly refetch facet counts on every increment — meta only depends
+  // on the filter set, never on which page is currently loaded.
+  const filterQueryString = useMemo(() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("q", debouncedSearch);
     if (branche) params.set("branche", branche);
@@ -87,34 +111,50 @@ export function CvrBrowser() {
     if (size) params.set("size", size);
     if (koebekraft) params.set("koebekraft", koebekraft);
     if (starredOnly) params.set("starred", "1");
+    if (myLocation && maxDistance != null) {
+      params.set("lat", String(myLocation.lat));
+      params.set("lng", String(myLocation.lng));
+      params.set("maxDistanceKm", String(maxDistance));
+    }
     params.set("sort", sort);
     params.set("dir", dir);
+    return params.toString();
+  }, [debouncedSearch, branche, region, size, koebekraft, starredOnly, myLocation, maxDistance, sort, dir]);
+
+  const companiesQueryString = useMemo(() => {
+    const params = new URLSearchParams(filterQueryString);
     params.set("page", String(page));
     params.set("pageSize", String(PAGE_SIZE));
     return params.toString();
-  }, [debouncedSearch, branche, region, size, koebekraft, starredOnly, sort, dir, page]);
+  }, [filterQueryString, page]);
 
   const load = useCallback(async () => {
     const id = ++requestId.current;
-    setLoading(true);
+    const isFirstPage = page === 1;
+    if (isFirstPage) setLoading(true);
+    else setLoadingMore(true);
     try {
       const [metaRes, companiesRes] = await Promise.all([
-        fetch(`/api/cvr/meta?${queryString}`),
-        fetch(`/api/cvr/companies?${queryString}`),
+        fetch(`/api/cvr/meta?${filterQueryString}`),
+        fetch(`/api/cvr/companies?${companiesQueryString}`),
       ]);
       if (!metaRes.ok || !companiesRes.ok) throw new Error("Kunne ikke hente CVR-data.");
       const metaJson = await metaRes.json();
       const companiesJson = await companiesRes.json();
       if (id !== requestId.current) return; // a newer request has since started
       setMeta(metaJson);
-      setRows(companiesJson.rows);
+      setRows((prev) => (isFirstPage ? companiesJson.rows : [...prev, ...companiesJson.rows]));
       setTotal(companiesJson.total);
     } catch (err) {
       showToast(errorMessage(err, "Kunne ikke hente CVR-data."));
     } finally {
-      if (id === requestId.current) setLoading(false);
+      if (id === requestId.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
-  }, [queryString, showToast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterQueryString, companiesQueryString, showToast]);
 
   useEffect(() => {
     // Fetching data on mount/filter-change (not subscribing to an external
@@ -126,6 +166,21 @@ export function CvrBrowser() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !loading && !loadingMore && rows.length < total) {
+          setPage((p) => p + 1);
+        }
+      },
+      { rootMargin: "400px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading, loadingMore, rows.length, total]);
+
   function resetPaging() {
     setPage(1);
   }
@@ -135,28 +190,45 @@ export function CvrBrowser() {
       setDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSort(key);
-      setDir(key === "navn" || key === "brancheTekst" ? "asc" : "desc");
+      setDir(key === "navn" || key === "brancheTekst" || key === "region" ? "asc" : "desc");
     }
     resetPaging();
   }
 
-  async function patchLead(cvr: string, body: Record<string, unknown>) {
-    try {
-      const res = await fetch(`/api/cvr/leads/${cvr}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error("Kunne ikke opdatere lead.");
-      const updated = await res.json();
-      setRows((prev) => prev.map((r) => (r.cvrNummer === cvr ? { ...r, lead: updated } : r)));
-      setSelected((prev) => (prev && prev.cvrNummer === cvr ? { ...prev, lead: updated } : prev));
-    } catch (err) {
-      showToast(errorMessage(err, "Kunne ikke opdatere lead."));
-    }
+  function sortIndicator(key: string) {
+    if (sort !== key) return null;
+    return (
+      <span
+        aria-hidden
+        style={{ display: "inline-block", marginLeft: 4, transition: "transform 0.15s ease", transform: dir === "asc" ? "rotate(180deg)" : "none" }}
+      >
+        ▼
+      </span>
+    );
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  function requestLocation() {
+    if (!navigator.geolocation) {
+      showToast("Din browser understøtter ikke lokation.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setMyLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setMaxDistance(300);
+        setLocating(false);
+        resetPaging();
+      },
+      (err) => {
+        showToast(`Kunne ikke hente din lokation (${err?.message || "afvist"}).`);
+        setLocating(false);
+      },
+      { timeout: 10000 },
+    );
+  }
+
+  const totalLoaded = rows.length;
 
   return (
     <section>
@@ -191,65 +263,153 @@ export function CvrBrowser() {
             </option>
           ))}
         </select>
-        <button type="button" className={`chip${starredOnly ? " star-active" : ""}`} onClick={() => { setStarredOnly((v) => !v); resetPaging(); }}>
-          ★ Stjernemarkerede
-        </button>
       </div>
 
       {filterPanelOpen ? (
-      <div className="filter-panel open">
-        <div className="filter-section">
-          <div className="filter-section-label">Branche</div>
-          <div className="filter-row">
-            <select className="field" value={branche} onChange={(e) => { setBranche(e.target.value); resetPaging(); }}>
-              <option value="">Alle brancher {meta ? `(${meta.total})` : ""}</option>
-              {meta?.brancher.map((b) => (
-                <option key={b.label} value={b.kodes.join(",")}>
-                  {b.label} ({b.n})
-                </option>
-              ))}
-            </select>
+        <div className="filter-panel open">
+          <div className="filter-section">
+            <div className="filter-section-label">Branche</div>
+            <div className="filter-row">
+              <select
+                className="field"
+                value={branche}
+                onChange={(e) => {
+                  setBranche(e.target.value);
+                  resetPaging();
+                }}
+              >
+                <option value="">Alle brancher {meta ? `(${meta.total})` : ""}</option>
+                {meta?.brancher.map((b) => (
+                  <option key={b.label} value={b.kodes.join(",")}>
+                    {b.label} ({b.n})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="filter-section">
+            <div className="filter-section-label">Region</div>
+            <div className="filter-row">
+              <select
+                className="field"
+                value={region}
+                onChange={(e) => {
+                  setRegion(e.target.value);
+                  resetPaging();
+                }}
+              >
+                <option value="">Alle regioner</option>
+                {meta?.regioner.map((r) => (
+                  <option key={r.region} value={r.region}>
+                    {r.region} ({r.n})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="filter-section">
+            <div className="filter-section-label">Størrelse</div>
+            <div className="filter-row">
+              <select
+                className="field"
+                value={size}
+                onChange={(e) => {
+                  setSize(e.target.value);
+                  resetPaging();
+                }}
+              >
+                <option value="">Alle størrelser</option>
+                <option value="small">10-49 ansatte</option>
+                <option value="medium">50-249 ansatte</option>
+                <option value="big">250+ ansatte</option>
+                <option value="unknown">Ukendt antal ansatte</option>
+              </select>
+            </div>
+          </div>
+          <div className="filter-section">
+            <div className="filter-section-label">Købekraft</div>
+            <div className="filter-row">
+              <select
+                className="field"
+                value={koebekraft}
+                onChange={(e) => {
+                  setKoebekraft(e.target.value);
+                  resetPaging();
+                }}
+              >
+                <option value="">Alle</option>
+                <option value="high">Høj (90+)</option>
+                <option value="solid">Solid (60-89)</option>
+                <option value="agil">Agil (30-59)</option>
+                <option value="nogo">Lav (under 30)</option>
+                <option value="unknown">Ukendt</option>
+              </select>
+            </div>
+          </div>
+          <div className="filter-section">
+            <div className="filter-section-label">Andet</div>
+            <div className="filter-row">
+              <button
+                type="button"
+                className={`chip${starredOnly ? " star-active" : ""}`}
+                onClick={() => {
+                  setStarredOnly((v) => !v);
+                  resetPaging();
+                }}
+              >
+                ★ Stjernemarkerede
+              </button>
+            </div>
+          </div>
+          <div className="filter-section">
+            <div className="filter-section-label">Afstand fra dig</div>
+            {!myLocation ? (
+              <div>
+                <button type="button" className="btn" onClick={requestLocation} disabled={locating}>
+                  {locating ? "Henter lokation…" : "Brug min lokation"}
+                </button>
+                <div className="distance-note">Afstande er omtrentlige (postnummer-niveau), ikke præcise adresser.</div>
+              </div>
+            ) : (
+              <div>
+                <div className="distance-box">
+                  <input
+                    type="range"
+                    min={5}
+                    max={500}
+                    step={5}
+                    value={maxDistance ?? 300}
+                    onChange={(e) => {
+                      setMaxDistance(parseInt(e.target.value, 10));
+                      resetPaging();
+                    }}
+                    style={{ "--range-pct": `${(((maxDistance ?? 300) - 5) / (500 - 5)) * 100}%` } as React.CSSProperties}
+                  />
+                  <span className="distance-pill">+{maxDistance} km</span>
+                </div>
+                <div className="distance-note">Afstande er omtrentlige (postnummer-niveau), ikke præcise adresser.</div>
+              </div>
+            )}
+          </div>
+          <div className="filter-footer">
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setBranche("");
+                setRegion("");
+                setSize("");
+                setKoebekraft("");
+                setStarredOnly(false);
+                setMaxDistance(null);
+                setSearch("");
+                resetPaging();
+              }}
+            >
+              Nulstil filtre
+            </button>
           </div>
         </div>
-        <div className="filter-section">
-          <div className="filter-section-label">Region</div>
-          <div className="filter-row">
-            <select className="field" value={region} onChange={(e) => { setRegion(e.target.value); resetPaging(); }}>
-              <option value="">Alle regioner</option>
-              {meta?.regioner.map((r) => (
-                <option key={r.region} value={r.region}>
-                  {r.region} ({r.n})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="filter-section">
-          <div className="filter-section-label">Størrelse</div>
-          <div className="filter-row">
-            <select className="field" value={size} onChange={(e) => { setSize(e.target.value); resetPaging(); }}>
-              <option value="">Alle størrelser</option>
-              <option value="small">10-49 ansatte</option>
-              <option value="medium">50-249 ansatte</option>
-              <option value="big">250+ ansatte</option>
-              <option value="unknown">Ukendt antal ansatte</option>
-            </select>
-          </div>
-        </div>
-        <div className="filter-section">
-          <div className="filter-section-label">Købekraft</div>
-          <div className="filter-row">
-            <select className="field" value={koebekraft} onChange={(e) => { setKoebekraft(e.target.value); resetPaging(); }}>
-              <option value="">Alle</option>
-              <option value="high">Høj (90+)</option>
-              <option value="solid">Solid (60-89)</option>
-              <option value="agil">Agil (30-59)</option>
-              <option value="nogo">Lav (under 30)</option>
-              <option value="unknown">Ukendt</option>
-            </select>
-          </div>
-        </div>
-      </div>
       ) : null}
 
       <div className="list-table-wrap">
@@ -257,29 +417,39 @@ export function CvrBrowser() {
           <thead>
             <tr>
               <th />
-              <th onClick={() => toggleSort("navn")} style={{ cursor: "pointer" }}>Navn</th>
-              <th onClick={() => toggleSort("brancheTekst")} style={{ cursor: "pointer" }}>Branche</th>
-              <th>Region</th>
-              <th onClick={() => toggleSort("employees")} style={{ cursor: "pointer" }}>Ansatte</th>
-              <th onClick={() => toggleSort("koebekraftScore")} style={{ cursor: "pointer" }}>Købekraft</th>
+              <th onClick={() => toggleSort("navn")} style={{ cursor: "pointer" }}>
+                Navn{sortIndicator("navn")}
+              </th>
+              <th onClick={() => toggleSort("brancheTekst")} style={{ cursor: "pointer" }}>
+                Branche{sortIndicator("brancheTekst")}
+              </th>
+              <th onClick={() => toggleSort("region")} style={{ cursor: "pointer" }}>
+                Region{sortIndicator("region")}
+              </th>
+              <th onClick={() => toggleSort("employees")} style={{ cursor: "pointer" }}>
+                Ansatte{sortIndicator("employees")}
+              </th>
+              <th onClick={() => toggleSort("koebekraftScore")} style={{ cursor: "pointer" }}>
+                Købekraft{sortIndicator("koebekraftScore")}
+              </th>
+              {myLocation ? <th>Afstand</th> : null}
               <th>Status</th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && !loading ? (
               <tr>
-                <td colSpan={7} className="empty">Ingen virksomheder matcher filtrene.</td>
+                <td colSpan={myLocation ? 9 : 8} className="empty">
+                  Ingen virksomheder matcher filtrene.
+                </td>
               </tr>
             ) : (
               rows.map((c) => (
-                <tr key={c.cvrNummer} className="list-table-row" onClick={() => setSelected(c)}>
+                <tr key={c.cvrNummer} className="list-table-row row-in" onClick={() => setSelected(c)}>
                   <td onClick={(e) => e.stopPropagation()}>
-                    <button
-                      type="button"
-                      className={`star-btn${c.lead?.starred ? " starred" : ""}`}
-                      onClick={() => patchLead(c.cvrNummer, { starred: !c.lead?.starred })}
-                    >
-                      {c.lead?.starred ? "★" : "☆"}
+                    <button type="button" className={`star-btn${c.starred ? " starred" : ""}`} onClick={() => handleToggleStar(c)}>
+                      {c.starred ? "★" : "☆"}
                     </button>
                   </td>
                   <td>{c.navn || "Ukendt navn"}</td>
@@ -287,7 +457,46 @@ export function CvrBrowser() {
                   <td>{c.region ?? "—"}</td>
                   <td>{c.employees ?? "—"}</td>
                   <td>{c.koebekraftScore ?? "—"}</td>
-                  <td>{c.lead?.stage ? <span className="status-pill" data-status={c.lead.stage}>{STAGE_LABELS[c.lead.stage] ?? c.lead.stage}</span> : "—"}</td>
+                  {myLocation ? <td>{c.distanceKm != null ? `${Math.round(c.distanceKm)} km` : "—"}</td> : null}
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <div className="status-menu">
+                      <button
+                        type="button"
+                        className="status-pill"
+                        data-status={c.pipeline?.status ?? "new"}
+                        onClick={() => setOpenStatusFor((v) => (v === c.cvrNummer ? null : c.cvrNummer))}
+                      >
+                        {statusLabel(c.pipeline?.status ?? "new")} ▾
+                      </button>
+                      {openStatusFor === c.cvrNummer ? (
+                        <div className="status-dropdown" style={{ display: "flex" }}>
+                          {STATUS_DEFS.map((s) => (
+                            <button
+                              key={s.key}
+                              type="button"
+                              className="status-opt"
+                              onClick={() => {
+                                setOpenStatusFor(null);
+                                handleSetStatus(c, s.key);
+                              }}
+                            >
+                              <span className={`status-dot ${s.key}`} />
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <ListMenu
+                      companyName={c.navn || `CVR ${c.cvrNummer}`}
+                      teamLists={teamLists}
+                      listIds={new Set(c.listIds)}
+                      onToggleList={(listId) => handleToggleList(c, listId)}
+                      onCreateList={(name) => handleCreateList(c, name)}
+                    />
+                  </td>
                 </tr>
               ))
             )}
@@ -296,23 +505,26 @@ export function CvrBrowser() {
       </div>
 
       <div className="load-more-row">
-        <button type="button" className="btn" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-          Forrige
-        </button>
+        <div ref={sentinelRef} className="load-more-sentinel" />
         <span className="distance-note">
-          Side {page} af {totalPages} · {total.toLocaleString("da-DK")} virksomheder
+          {loadingMore
+            ? "Indlæser flere…"
+            : `Viser ${totalLoaded.toLocaleString("da-DK")} af ${total.toLocaleString("da-DK")} virksomheder`}
         </span>
-        <button type="button" className="btn" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-          Næste
-        </button>
       </div>
 
       {selected ? (
         <CvrDrawer
           company={selected}
+          myName={myName}
+          teamLists={teamLists}
           onClose={() => setSelected(null)}
-          onToggleStar={() => patchLead(selected.cvrNummer, { starred: !selected.lead?.starred })}
-          onSetStage={(stage) => patchLead(selected.cvrNummer, stage === null ? { clearStage: true } : { stage })}
+          onToggleStar={() => handleToggleStar(selected)}
+          onSetStatus={(status) => handleSetStatus(selected, status)}
+          onAssign={() => handleAssign(selected)}
+          onRelease={() => handleRelease(selected)}
+          onToggleList={(listId) => handleToggleList(selected, listId)}
+          onCreateList={(name) => handleCreateList(selected, name)}
         />
       ) : null}
     </section>

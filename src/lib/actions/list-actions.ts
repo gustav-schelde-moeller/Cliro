@@ -23,9 +23,17 @@ async function requireListInTeam(teamId: string, listId: string) {
   return list;
 }
 
+// Private lists are only visible/actionable by their creator — enforced
+// here so a guessed/leaked listId can't be used to read or mutate a list
+// the UI never shows to anyone else.
+function requireListAccess(list: { isPrivate: boolean; createdBy: string }, userId: string) {
+  if (list.isPrivate && list.createdBy !== userId) throw new Error("Du har ikke adgang til den liste.");
+}
+
 function revalidateListPages() {
   revalidatePath("/virksomheder");
   revalidatePath("/lister");
+  revalidatePath("/team");
 }
 
 export async function createListAction(teamId: string, name: string): Promise<{ id: string; name: string }> {
@@ -51,6 +59,7 @@ export async function deleteListAction(teamId: string, listId: string) {
   const user = await requireUser();
   await requireMembership(teamId, user.id);
   const list = await requireListInTeam(teamId, listId);
+  requireListAccess(list, user.id);
 
   await prisma.companyList.delete({ where: { id: listId } });
   await prisma.activityLog.create({
@@ -63,6 +72,7 @@ export async function toggleCompanyInListAction(teamId: string, listId: string, 
   const user = await requireUser();
   await requireMembership(teamId, user.id);
   const list = await requireListInTeam(teamId, listId);
+  requireListAccess(list, user.id);
   const company = await getCompanyById(companyId);
   if (!company) throw new Error("Ukendt virksomhed.");
 
@@ -103,5 +113,75 @@ export async function createListAndAddAction(
 ): Promise<{ id: string; name: string }> {
   const list = await createListAction(teamId, name);
   await toggleCompanyInListAction(teamId, list.id, companyId);
+  return list;
+}
+
+export async function toggleListVisibilityAction(teamId: string, listId: string) {
+  const user = await requireUser();
+  await requireMembership(teamId, user.id);
+  const list = await requireListInTeam(teamId, listId);
+  if (list.createdBy !== user.id) throw new Error("Kun listens ejer kan ændre synligheden.");
+
+  const updated = await prisma.companyList.update({
+    where: { id: listId },
+    data: { isPrivate: !list.isPrivate },
+  });
+  await prisma.activityLog.create({
+    data: {
+      teamId,
+      userId: user.id,
+      who: user.name ?? "Ukendt",
+      action: updated.isPrivate ? `gjorde listen "${list.name}" privat` : `gjorde listen "${list.name}" synlig for teamet`,
+    },
+  });
+  revalidateListPages();
+  return { isPrivate: updated.isPrivate };
+}
+
+export async function toggleCvrCompanyInListAction(teamId: string, listId: string, cvrNummer: string) {
+  const user = await requireUser();
+  await requireMembership(teamId, user.id);
+  const list = await requireListInTeam(teamId, listId);
+  requireListAccess(list, user.id);
+  const company = await prisma.cvrCompany.findUnique({ where: { cvrNummer } });
+  if (!company) throw new Error("Ukendt virksomhed.");
+
+  const existing = await prisma.cvrListItem.findUnique({
+    where: { listId_cvrNummer: { listId, cvrNummer } },
+  });
+
+  if (existing) {
+    await prisma.cvrListItem.delete({ where: { id: existing.id } });
+    await prisma.activityLog.create({
+      data: {
+        teamId,
+        userId: user.id,
+        who: user.name ?? "Ukendt",
+        action: `fjernede fra listen "${list.name}":`,
+        companyName: company.navn ?? `CVR ${cvrNummer}`,
+      },
+    });
+  } else {
+    await prisma.cvrListItem.create({ data: { listId, cvrNummer, addedBy: user.id } });
+    await prisma.activityLog.create({
+      data: {
+        teamId,
+        userId: user.id,
+        who: user.name ?? "Ukendt",
+        action: `tilføjede til listen "${list.name}":`,
+        companyName: company.navn ?? `CVR ${cvrNummer}`,
+      },
+    });
+  }
+  revalidateListPages();
+}
+
+export async function createCvrListAndAddAction(
+  teamId: string,
+  name: string,
+  cvrNummer: string,
+): Promise<{ id: string; name: string }> {
+  const list = await createListAction(teamId, name);
+  await toggleCvrCompanyInListAction(teamId, list.id, cvrNummer);
   return list;
 }

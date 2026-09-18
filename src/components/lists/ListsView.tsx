@@ -8,14 +8,26 @@ import type { TeamListOption } from "@/components/leads/ListMenu";
 import { LeadDrawer } from "@/components/leads/LeadDrawer";
 import { useLeadMutations } from "@/components/leads/useLeadMutations";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
-import { createListAction, deleteListAction, toggleCompanyInListAction } from "@/lib/actions/list-actions";
+import {
+  createListAction,
+  deleteListAction,
+  toggleCompanyInListAction,
+  toggleCvrCompanyInListAction,
+  toggleListVisibilityAction,
+} from "@/lib/actions/list-actions";
+import { ListActionsMenu } from "./ListActionsMenu";
+
+type CvrListCompany = { cvrNummer: string; navn: string | null; brancheTekst: string | null; kommunenavn: string | null; email: string | null };
 
 type ListItem = {
   id: string;
   name: string;
   createdAt: string;
   createdByName: string | null;
+  isPrivate: boolean;
+  isMine: boolean;
   companies: Company[];
+  cvrCompanies: CvrListCompany[];
 };
 
 export function ListsView({
@@ -42,7 +54,6 @@ export function ListsView({
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const {
@@ -94,10 +105,20 @@ export function ListsView({
     startTransition(async () => {
       try {
         await deleteListAction(teamId, id);
-        setConfirmingDeleteId(null);
         router.refresh();
       } catch (err) {
         showToast(errorMessage(err, "Kunne ikke slette listen."));
+      }
+    });
+  }
+
+  function handleToggleVisibility(listId: string) {
+    startTransition(async () => {
+      try {
+        await toggleListVisibilityAction(teamId, listId);
+        router.refresh();
+      } catch (err) {
+        showToast(errorMessage(err, "Kunne ikke ændre synligheden."));
       }
     });
   }
@@ -106,6 +127,17 @@ export function ListsView({
     startTransition(async () => {
       try {
         await toggleCompanyInListAction(teamId, listId, companyId);
+        router.refresh();
+      } catch (err) {
+        showToast(errorMessage(err, "Kunne ikke fjerne virksomheden."));
+      }
+    });
+  }
+
+  function handleRemoveCvrCompany(listId: string, cvrNummer: string) {
+    startTransition(async () => {
+      try {
+        await toggleCvrCompanyInListAction(teamId, listId, cvrNummer);
         router.refresh();
       } catch (err) {
         showToast(errorMessage(err, "Kunne ikke fjerne virksomheden."));
@@ -184,37 +216,30 @@ export function ListsView({
                   </svg>
                   <h3 className="list-name-link">{list.name}</h3>
                   <span className="tag">
-                    {list.companies.length} {list.companies.length === 1 ? "virksomhed" : "virksomheder"}
+                    {list.companies.length + list.cvrCompanies.length} {list.companies.length + list.cvrCompanies.length === 1 ? "virksomhed" : "virksomheder"}
                   </span>
+                  {list.isPrivate ? <span className="tag">🔒 Privat</span> : null}
                 </div>
                 <div className="list-header-actions" onClick={(e) => e.stopPropagation()}>
-                  <a className="btn" href={`/api/lists/${list.id}/export`}>
-                    Eksportér
-                  </a>
-                  {confirmingDeleteId === list.id ? (
-                    <div className="delete-confirm-row">
-                      <button type="button" className="btn" disabled={isPending} onClick={() => setConfirmingDeleteId(null)}>
-                        Fortryd
-                      </button>
-                      <button type="button" className="btn danger" disabled={isPending} onClick={() => handleDelete(list.id)}>
-                        {isPending ? "Sletter…" : "Ja, slet"}
-                      </button>
-                    </div>
-                  ) : (
-                    <button type="button" className="btn danger" onClick={() => setConfirmingDeleteId(list.id)}>
-                      Slet
-                    </button>
-                  )}
+                  <ListActionsMenu
+                    listId={list.id}
+                    listName={list.name}
+                    isPrivate={list.isPrivate}
+                    isMine={list.isMine}
+                    onToggleVisibility={() => handleToggleVisibility(list.id)}
+                    onDelete={() => handleDelete(list.id)}
+                  />
                 </div>
               </div>
               {list.createdByName ? <div className="distance-note list-created-note">Oprettet af {list.createdByName}</div> : null}
               <div className={`list-body-wrap${isExpanded ? " expanded" : ""}`}>
                 <div>
-                  {list.companies.length === 0 ? (
+                  {list.companies.length === 0 && list.cvrCompanies.length === 0 ? (
                     <div className="dash-empty" style={{ marginTop: 12 }}>
                       Ingen virksomheder i denne liste endnu.
                     </div>
-                  ) : (
+                  ) : null}
+                  {list.companies.length > 0 ? (
                     <div className="list-table-wrap" style={{ marginTop: 12 }}>
                       <table className="list-table">
                         <thead>
@@ -255,7 +280,42 @@ export function ListsView({
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  ) : null}
+                  {list.cvrCompanies.length > 0 ? (
+                    <div className="list-table-wrap" style={{ marginTop: 12 }}>
+                      <table className="list-table">
+                        <thead>
+                          <tr>
+                            <th>Navn</th>
+                            <th>Branche</th>
+                            <th>By</th>
+                            <th>Email</th>
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {list.cvrCompanies.map((c) => (
+                            <tr key={c.cvrNummer} className="list-table-row">
+                              <td>{c.navn || "Ukendt navn"}</td>
+                              <td>{c.brancheTekst ?? "—"}</td>
+                              <td>{c.kommunenavn ?? "—"}</td>
+                              <td>{c.email ?? "—"}</td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="btn"
+                                  disabled={isPending}
+                                  onClick={() => handleRemoveCvrCompany(list.id, c.cvrNummer)}
+                                >
+                                  Fjern
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>

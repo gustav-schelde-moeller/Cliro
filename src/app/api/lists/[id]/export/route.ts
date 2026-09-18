@@ -22,8 +22,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!membership) {
     return Response.json({ error: "Du er ikke medlem af det team." }, { status: 403 });
   }
+  if (list.isPrivate && list.createdBy !== session.user.id) {
+    return Response.json({ error: "Du har ikke adgang til den liste." }, { status: 403 });
+  }
 
-  const items = await prisma.companyListItem.findMany({ where: { listId }, select: { companyId: true } });
+  const [items, cvrItems] = await Promise.all([
+    prisma.companyListItem.findMany({ where: { listId }, select: { companyId: true } }),
+    prisma.cvrListItem.findMany({ where: { listId }, select: { company: true } }),
+  ]);
   const companyIds = new Set(items.map((i) => i.companyId));
   const allCompanies = await getCompanies();
   const companies = allCompanies.filter((c) => companyIds.has(c.id));
@@ -92,6 +98,51 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       };
     });
   });
+
+  if (cvrItems.length > 0) {
+    const cvrSheet = workbook.addWorksheet("CVR", { views: [{ state: "frozen", ySplit: 1 }] });
+    cvrSheet.columns = [
+      { header: "CVR-nummer", key: "cvrNummer", width: 14 },
+      { header: "Navn", key: "navn", width: 28 },
+      { header: "Branche", key: "brancheTekst", width: 24 },
+      { header: "Region", key: "region", width: 16 },
+      { header: "Ansatte", key: "employees", width: 10 },
+      { header: "Købekraft", key: "koebekraftScore", width: 11 },
+      { header: "Email", key: "email", width: 30 },
+      { header: "Telefon", key: "telefon", width: 16 },
+      { header: "Adresse", key: "adresse", width: 30 },
+    ];
+    const cvrHeaderRow = cvrSheet.getRow(1);
+    cvrHeaderRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cvrHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2F55FC" } };
+    cvrHeaderRow.alignment = { vertical: "middle" };
+    cvrHeaderRow.height = 22;
+    cvrSheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cvrSheet.columns.length } };
+
+    cvrItems.forEach(({ company: c }, i) => {
+      const row = cvrSheet.addRow({
+        cvrNummer: c.cvrNummer,
+        navn: c.navn ?? "",
+        brancheTekst: c.brancheTekst ?? "",
+        region: c.region ?? "",
+        employees: c.employees ?? "",
+        koebekraftScore: c.koebekraftScore ?? "",
+        email: c.email ?? "",
+        telefon: c.telefon ?? "",
+        adresse: [c.vejnavn, c.husnummer].filter(Boolean).join(" "),
+      });
+      row.font = { color: { argb: "FF1A1D24" } };
+      row.alignment = { vertical: "top", wrapText: true };
+      if (i % 2 === 1) {
+        row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F3F5" } };
+      }
+    });
+    cvrSheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.border = { bottom: { style: "thin", color: { argb: "FFE2E5E9" } } };
+      });
+    });
+  }
 
   const buffer = await workbook.xlsx.writeBuffer();
   const safeName = list.name.replace(/[^\p{L}\p{N}_-]+/gu, "_") || "Liste";

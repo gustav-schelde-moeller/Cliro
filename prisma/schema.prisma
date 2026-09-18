@@ -19,14 +19,16 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
 
-  accounts        Account[]
-  sessions        Session[]
-  teamMemberships TeamMember[]
-  ownedTeams      Team[]               @relation("TeamOwner")
-  stars           Star[]
-  activity        ActivityLog[]
-  leadsAssigned   Lead[]               @relation("LeadAssignee")
-  resetTokens     PasswordResetToken[]
+  accounts         Account[]
+  sessions         Session[]
+  teamMemberships  TeamMember[]
+  ownedTeams       Team[]               @relation("TeamOwner")
+  stars            Star[]
+  activity         ActivityLog[]
+  leadsAssigned    Lead[]               @relation("LeadAssignee")
+  resetTokens      PasswordResetToken[]
+  cvrLeadsAssigned CvrTeamLead[]        @relation("CvrLeadAssignee")
+  cvrStars         CvrStar[]
 }
 
 // Standard Auth.js (NextAuth) models — required by the Prisma adapter so
@@ -74,11 +76,12 @@ model Team {
   ownerId   String
   createdAt DateTime @default(now())
 
-  owner    User          @relation("TeamOwner", fields: [ownerId], references: [id])
-  members  TeamMember[]
-  leads    Lead[]
-  activity ActivityLog[]
-  lists    CompanyList[]
+  owner        User          @relation("TeamOwner", fields: [ownerId], references: [id])
+  members      TeamMember[]
+  leads        Lead[]
+  activity     ActivityLog[]
+  lists        CompanyList[]
+  cvrTeamLeads CvrTeamLead[]
 }
 
 model TeamMember {
@@ -162,16 +165,19 @@ model ActivityLog {
 
 // Named, team-shared batches of companies (e.g. "Denne uges ringerunde")
 // for organizing and exporting call sessions. companyId is a loose
-// reference to Company.id, same convention as Lead/Star.
+// reference to Company.id, same convention as Lead/Star. isPrivate defaults
+// to false so every existing list keeps its current (team-visible) behavior.
 model CompanyList {
   id        String   @id @default(cuid())
   teamId    String
   name      String
   createdBy String
+  isPrivate Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  team  Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  items CompanyListItem[]
+  team     Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  items    CompanyListItem[]
+  cvrItems CvrListItem[]
 
   @@unique([teamId, name])
 }
@@ -243,37 +249,79 @@ model CvrCompany {
   regnskabAar             Int?    @map("regnskab_aar")
   koebekraftScore         Int?    @map("koebekraft_score")
 
-  lead CvrLead?
+  // Backfilled — lat/lng from Danish postnummer centroids (DAWA), region
+  // from the REGION_BY_KOMMUNEKODE lookup already used at query time
+  // (src/lib/cvr/filters.ts). See scripts/backfill-cvr-derived-fields.mjs.
+  lat    Float?
+  lng    Float?
+  region String?
+
+  teamLeads CvrTeamLead[]
+  stars     CvrStar[]
+  listItems CvrListItem[]
 
   @@index([status])
   @@index([brancheKode])
   @@index([postnummer])
   @@index([kommunekode])
   @@index([navn])
+  @@index([region])
+  @@index([lat, lng])
   @@map("cvr_companies")
 }
 
-// Per-CVR-number lead tracking (stage/notes/star) — the CVR-registry
-// equivalent of Lead/Star for the AI-curated Company list, but 1:1 on
-// cvrNummer rather than per-team, matching the original tool (a single
-// shared lead state per company, not per-team).
-model CvrLead {
-  cvrNummer     String   @id @map("cvr_nummer")
-  stage         String?
-  notes         String?
-  lastContacted String?  @map("last_contacted")
-  starred       Boolean  @default(false)
-  updatedAt     DateTime @updatedAt @map("updated_at")
+// Team-scoped CVR pipeline state — the CVR-registry equivalent of Lead
+// (same status vocabulary, see src/lib/status.ts's STATUS_DEFS).
+model CvrTeamLead {
+  id         String   @id @default(cuid())
+  teamId     String
+  cvrNummer  String
+  status     String   @default("new")
+  assigneeId String?
+  updatedAt  DateTime @updatedAt
 
+  team     Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  company  CvrCompany @relation(fields: [cvrNummer], references: [cvrNummer], onDelete: Cascade)
+  assignee User?      @relation("CvrLeadAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@unique([teamId, cvrNummer])
+  @@map("cvr_team_leads")
+}
+
+// Per-user bookmark for CVR companies — the CVR-registry equivalent of Star.
+model CvrStar {
+  id        String @id @default(cuid())
+  userId    String
+  cvrNummer String
+
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   company CvrCompany @relation(fields: [cvrNummer], references: [cvrNummer], onDelete: Cascade)
 
-  @@map("cvr_leads")
+  @@unique([userId, cvrNummer])
+  @@map("cvr_stars")
+}
+
+// CVR-registry join for CompanyList — separate table from CompanyListItem
+// because CvrCompany's key is a String (cvrNummer), not the Int companyId
+// CompanyListItem uses for the AI-lead Company table.
+model CvrListItem {
+  id        String   @id @default(cuid())
+  listId    String
+  cvrNummer String
+  addedBy   String
+  addedAt   DateTime @default(now())
+
+  list    CompanyList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  company CvrCompany  @relation(fields: [cvrNummer], references: [cvrNummer], onDelete: Cascade)
+
+  @@unique([listId, cvrNummer])
+  @@map("cvr_list_items")
 }
 
 // Financial dashboard data — replaces financial-dashboard's local JSON
 // file store (server/src/lib/store.ts) now that it runs as part of Cliro.
 model FinTransaction {
-  id           String @id
+  id           String  @id
   source       String
   date         String
   description  String
@@ -289,7 +337,7 @@ model FinTransaction {
 // matches the original's overwrite-the-whole-array-to-JSON behavior, so no
 // versioning/history is kept, same as before.
 model FinPipelineRow {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   date      String
   client    String
   status    String

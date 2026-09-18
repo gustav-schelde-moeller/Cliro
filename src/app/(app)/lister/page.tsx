@@ -11,10 +11,10 @@ export default async function ListerPage() {
   if (!teamId) redirect("/team-gate");
 
   const [lists, leadsMap, stars, listMembershipsMap] = await Promise.all([
-    getListsWithCompanies(teamId),
+    getListsWithCompanies(teamId, session.user.id),
     getTeamLeadsMap(teamId),
     getUserStars(session.user.id),
-    getCompanyListMemberships(teamId),
+    getCompanyListMemberships(teamId, session.user.id),
   ]);
 
   const listMembershipsPlain = Object.fromEntries(
