@@ -15,6 +15,11 @@ const config: NextAuthConfig = {
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
+  // Vercel's own deployment host is auto-trusted by Auth.js; on any other
+  // host (Railway, a custom domain, etc.) Auth.js rejects the request as an
+  // UntrustedHost unless told otherwise. NEXTAUTH_URL is already set to the
+  // real deployed origin, so this isn't opening up Host-header spoofing.
+  trustHost: true,
   providers: [
     Credentials({
       name: "credentials",

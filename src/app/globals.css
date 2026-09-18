@@ -27,8 +27,9 @@
   --shadow: 0 20px 50px -20px rgba(20,22,26,0.22);
   --shadow-sm: 0 2px 10px -4px rgba(20,22,26,0.12);
 
-  --font-display: var(--font-space-grotesk), "IBM Plex Sans", sans-serif;
-  --font-body: var(--font-ibm-plex-sans), -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-davai-extended), "IBM Plex Sans", sans-serif;
+  --font-medium: var(--font-davai-medium), var(--font-display);
+  --font-body: var(--font-davai-roman), -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-ibm-plex-mono), "SF Mono", Consolas, monospace;
 }
 @media (prefers-color-scheme: dark){

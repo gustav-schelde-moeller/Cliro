@@ -1,19 +1,27 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
+import { IBM_Plex_Mono } from "next/font/google";
 import { UpdateChecker } from "@/components/shared/UpdateChecker";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-space-grotesk",
+// DAVAI's real brand fonts (handed off alongside cvr-tool and
+// financial-dashboard, which already used them under these same names) —
+// replaces the Google Fonts placeholders the app launched with.
+const davaiExtended = localFont({
+  src: "../../public/fonts/HelveticaNeueLTStd_Medium_Extended.otf",
+  variable: "--font-davai-extended",
   display: "swap",
 });
 
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-ibm-plex-sans",
+const davaiMedium = localFont({
+  src: "../../public/fonts/HelveticaNeueLTStd_Medium.otf",
+  variable: "--font-davai-medium",
+  display: "swap",
+});
+
+const davaiRoman = localFont({
+  src: "../../public/fonts/HelveticaNeueLT_Roman.ttf",
+  variable: "--font-davai-roman",
   display: "swap",
 });
 
@@ -40,7 +48,10 @@ const THEME_INIT_SCRIPT = `
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="da" className={`${spaceGrotesk.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}>
+    <html
+      lang="da"
+      className={`${davaiExtended.variable} ${davaiMedium.variable} ${davaiRoman.variable} ${ibmPlexMono.variable}`}
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
