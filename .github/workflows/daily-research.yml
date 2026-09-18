@@ -1,8 +1,10 @@
 name: Daily company research
 
-# Vercel's own Cron Jobs feature is limited on the Hobby plan (rejected a
-# 4x/day schedule), so this workflow triggers the same endpoint instead —
-# GitHub Actions' scheduler isn't subject to that limit.
+# Railway doesn't have a built-in cron scheduler on this plan (and this
+# also predates the move off Vercel, where the same limitation applied to
+# Vercel's own Cron Jobs on the Hobby plan), so this workflow triggers the
+# endpoint on a schedule instead — GitHub Actions isn't subject to either
+# platform's limits.
 on:
   schedule:
     - cron: "0 6,8,10,12 * * 1-5"
@@ -16,4 +18,4 @@ jobs:
         run: |
           curl -s -w "\nHTTP status: %{http_code}\n" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            https://cliro-tau.vercel.app/api/cron/daily-research
+            https://cliro-app-production.up.railway.app/api/cron/daily-research
