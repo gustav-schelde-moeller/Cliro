@@ -41,6 +41,29 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: process.env.NEXT_PUBLIC_CVR_TOOL_URL || "https://cvr-tool-production.up.railway.app",
+    label: "CVR",
+    external: true,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M5 20V6.5a1.5 1.5 0 0 1 1.5-1.5h7A1.5 1.5 0 0 1 15 6.5V20" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        <path d="M15 11h3.5A1.5 1.5 0 0 1 20 12.5V20" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        <path d="M3 20h18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        <path d="M8 8.5h1M11 8.5h1M8 12h1M11 12h1M8 15.5h1M11 15.5h1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    href: process.env.NEXT_PUBLIC_FINANCIAL_DASHBOARD_URL || "https://financial-dashboard-production-5cb5.up.railway.app",
+    label: "Regnskab",
+    external: true,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M4 20V10M10 20V4M16 20v-7M20 20H4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/team",
     label: "Team",
     icon: (
@@ -189,15 +212,22 @@ export function Sidebar({
         <TeamSwitcher teamName={teamName} teamId={teamId} userTeams={userTeams} />
       </div>
       <nav className="sidebar-nav">
-        {NAV_ITEMS.map((item) => (
-          <Link key={item.href} href={item.href} className={`nav-item${pathname === item.href ? " active" : ""}`}>
-            {item.icon}
-            <span>{item.label}</span>
-            {item.href === "/virksomheder" ? (
-              <span className="nav-badge">{companyCount}</span>
-            ) : null}
-          </Link>
-        ))}
+        {NAV_ITEMS.map((item) =>
+          item.external ? (
+            <a key={item.href} href={item.href} target="_blank" rel="noopener noreferrer" className="nav-item">
+              {item.icon}
+              <span>{item.label}</span>
+            </a>
+          ) : (
+            <Link key={item.href} href={item.href} className={`nav-item${pathname === item.href ? " active" : ""}`}>
+              {item.icon}
+              <span>{item.label}</span>
+              {item.href === "/virksomheder" ? (
+                <span className="nav-badge">{companyCount}</span>
+              ) : null}
+            </Link>
+          ),
+        )}
       </nav>
       <Link href="/indstillinger" className={`nav-item settings-link${pathname === "/indstillinger" ? " active" : ""}`}>
         <svg viewBox="0 0 24 24" fill="none">
