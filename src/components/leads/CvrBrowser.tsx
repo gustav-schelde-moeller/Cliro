@@ -74,6 +74,8 @@ export function CvrBrowser() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<CvrCompanyRow | null>(null);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const activeFilterCount = (branche ? 1 : 0) + (region ? 1 : 0) + (size ? 1 : 0) + (koebekraft ? 1 : 0);
   const debouncedSearch = useDebounced(search, 350);
   const requestId = useRef(0);
 
@@ -175,6 +177,13 @@ export function CvrBrowser() {
             }}
           />
         </div>
+        <button type="button" className="filter-btn" onClick={() => setFilterPanelOpen((v) => !v)}>
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          Filtrér
+          {activeFilterCount > 0 ? <span className="filter-count">{activeFilterCount}</span> : null}
+        </button>
         <select className="sort-select" value={sort} onChange={(e) => toggleSort(e.target.value)}>
           {SORT_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -187,6 +196,7 @@ export function CvrBrowser() {
         </button>
       </div>
 
+      {filterPanelOpen ? (
       <div className="filter-panel open">
         <div className="filter-section">
           <div className="filter-section-label">Branche</div>
@@ -240,6 +250,7 @@ export function CvrBrowser() {
           </div>
         </div>
       </div>
+      ) : null}
 
       <div className="list-table-wrap">
         <table className="list-table">
