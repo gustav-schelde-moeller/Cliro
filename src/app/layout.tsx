@@ -57,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {children}
-        <UpdateChecker currentCommit={process.env.VERCEL_GIT_COMMIT_SHA ?? null} />
+        <UpdateChecker currentCommit={process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.RAILWAY_GIT_COMMIT_SHA ?? null} />
       </body>
     </html>
   );
