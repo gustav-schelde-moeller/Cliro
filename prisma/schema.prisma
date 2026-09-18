@@ -197,3 +197,155 @@ model PasswordResetToken {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+// The full Danish CVR business registry (~420k active companies) — a
+// separate, much larger dataset from Company (which is the small,
+// AI-curated news-lead list). Mirrors the schema of the handed-off
+// cvr-tool's SQLite db exactly, including its column names via @map, so
+// the migration script can copy rows through unchanged.
+model CvrCompany {
+  cvrNummer               String  @id @map("cvr_nummer")
+  cvrEnhedsId             String? @map("cvr_enheds_id")
+  status                  String
+  startdato               String?
+  ophoersdato             String?
+  virksomhedsformKode     String? @map("virksomhedsform_kode")
+  virksomhedsformTekst    String? @map("virksomhedsform_tekst")
+  navn                    String? // ~123 of 420k real rows have no registered name
+  brancheKode             String? @map("branche_kode")
+  brancheTekst            String? @map("branche_tekst")
+  email                   String?
+  telefon                 String?
+  vejnavn                 String?
+  husnummer               String?
+  etage                   String?
+  doer                    String?
+  postnummer              String?
+  postdistrikt            String?
+  kommunekode             String?
+  kommunenavn             String?
+  supplerendeBynavn       String? @map("supplerende_bynavn")
+  adresseFritekst         String? @map("adresse_fritekst")
+  landekode               String?
+  produktionsenhederAntal Int     @default(0) @map("produktionsenheder_antal")
+  employees               Int?
+  sizeBucket              String? @map("size_bucket")
+  // Float, not Int: large companies' DKK figures exceed Postgres's 32-bit
+  // Int range (seen: 3.6 billion) — SQLite's own INTEGER is 64-bit so the
+  // source data never hit this. Values are whole kroner with no decimals;
+  // a JS double's 53-bit integer precision is far more than enough.
+  likvideBeholdninger     Float?  @map("likvide_beholdninger")
+  egenkapital             Float?
+  driftsresultat          Float?
+  nettoresultat           Float?
+  udbetaltUdbytte         Float?  @map("udbetalt_udbytte")
+  kapitalforoegelse       Float?
+  regnskabAar             Int?    @map("regnskab_aar")
+  koebekraftScore         Int?    @map("koebekraft_score")
+
+  lead CvrLead?
+
+  @@index([status])
+  @@index([brancheKode])
+  @@index([postnummer])
+  @@index([kommunekode])
+  @@index([navn])
+  @@map("cvr_companies")
+}
+
+// Per-CVR-number lead tracking (stage/notes/star) — the CVR-registry
+// equivalent of Lead/Star for the AI-curated Company list, but 1:1 on
+// cvrNummer rather than per-team, matching the original tool (a single
+// shared lead state per company, not per-team).
+model CvrLead {
+  cvrNummer     String   @id @map("cvr_nummer")
+  stage         String?
+  notes         String?
+  lastContacted String?  @map("last_contacted")
+  starred       Boolean  @default(false)
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  company CvrCompany @relation(fields: [cvrNummer], references: [cvrNummer], onDelete: Cascade)
+
+  @@map("cvr_leads")
+}
+
+// Financial dashboard data — replaces financial-dashboard's local JSON
+// file store (server/src/lib/store.ts) now that it runs as part of Cliro.
+model FinTransaction {
+  id           String @id
+  source       String
+  date         String
+  description  String
+  counterparty String?
+  amount       Float
+  category     String
+
+  @@index([date])
+  @@map("fin_transactions")
+}
+
+// Wholesale-replaced (deleteMany + createMany) on every "refresh sheets" —
+// matches the original's overwrite-the-whole-array-to-JSON behavior, so no
+// versioning/history is kept, same as before.
+model FinPipelineRow {
+  id        String @id @default(cuid())
+  date      String
+  client    String
+  status    String
+  segment   String
+  type      String
+  vat       Boolean
+  revenue   Float
+  vatAmount Float
+  inclVat   Float
+
+  @@map("fin_pipeline")
+}
+
+model FinProspectiveRow {
+  id      String @id @default(cuid())
+  client  String
+  segment String
+  type    String
+  status  String
+  revenue Float
+
+  @@map("fin_prospective")
+}
+
+model FinRecurringRow {
+  id            String  @id @default(cuid())
+  vendor        String
+  category      String
+  monthlyAmount Float
+  vat           Boolean
+  vatAmount     Float
+  totalAmount   Float
+  startDate     String
+  endDate       String
+
+  @@map("fin_recurring")
+}
+
+// Singleton row (id is always "singleton") for cash position + salaries.
+model FinSettings {
+  id            String    @id @default("singleton")
+  cashBalance   Float?
+  cashAsOf      DateTime?
+  salaries      Json
+  lastSheetSync DateTime?
+
+  @@map("fin_settings")
+}
+
+model FinImportLog {
+  id      String   @id @default(cuid())
+  source  String
+  file    String
+  added   Int
+  skipped Int
+  at      DateTime @default(now())
+
+  @@map("fin_import_log")
+}

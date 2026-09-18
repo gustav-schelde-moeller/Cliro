@@ -41,19 +41,6 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: process.env.NEXT_PUBLIC_CVR_TOOL_URL || "https://cvr-tool-production.up.railway.app",
-    label: "CVR",
-    external: true,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none">
-        <path d="M5 20V6.5a1.5 1.5 0 0 1 1.5-1.5h7A1.5 1.5 0 0 1 15 6.5V20" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-        <path d="M15 11h3.5A1.5 1.5 0 0 1 20 12.5V20" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-        <path d="M3 20h18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-        <path d="M8 8.5h1M11 8.5h1M8 12h1M11 12h1M8 15.5h1M11 15.5h1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
     href: process.env.NEXT_PUBLIC_FINANCIAL_DASHBOARD_URL || "https://financial-dashboard-production-5cb5.up.railway.app",
     label: "Regnskab",
     external: true,

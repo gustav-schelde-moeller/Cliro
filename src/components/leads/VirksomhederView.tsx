@@ -6,6 +6,7 @@ import { LeadCard, type LeadState, type TeamListOption } from "./LeadCard";
 import { LeadDrawer } from "./LeadDrawer";
 import { useLeadMutations } from "./useLeadMutations";
 import { useToast } from "@/components/shared/ToastProvider";
+import { CvrBrowser } from "./CvrBrowser";
 
 const PAGE_SIZE = 6;
 const TIER_DEFS = [
@@ -74,6 +75,7 @@ export function VirksomhederView({
   const [infoOpen, setInfoOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [locating, setLocating] = useState(false);
+  const [mode, setMode] = useState<"leads" | "cvr">("leads");
 
   const todayDa = TODAY_FORMATTER.format(new Date());
 
@@ -182,6 +184,17 @@ export function VirksomhederView({
 
   return (
     <section>
+      <div className="filter-row" style={{ marginBottom: 16 }}>
+        <button type="button" className={`chip${mode === "leads" ? " active" : ""}`} onClick={() => setMode("leads")}>
+          AI Leads
+        </button>
+        <button type="button" className={`chip${mode === "cvr" ? " active" : ""}`} onClick={() => setMode("cvr")}>
+          CVR-søgning
+        </button>
+      </div>
+
+      {mode === "cvr" ? <CvrBrowser /> : (
+      <>
       <div className="toolbar">
         <div className="search-wrap">
           <svg viewBox="0 0 24 24" fill="none">
@@ -377,6 +390,8 @@ export function VirksomhederView({
           onCreateList={(name) => handleCreateList(selectedCompany.id, name)}
         />
       ) : null}
+      </>
+      )}
     </section>
   );
 }
