@@ -6,6 +6,7 @@ import { getCompanies } from "@/lib/companies";
 import { STATUS_DEFS } from "@/lib/status";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { DashboardInProgress } from "@/components/dashboard/DashboardInProgress";
+import { RegnskabPanel } from "@/components/dashboard/RegnskabPanel";
 import { prisma } from "@/lib/prisma";
 
 function timeAgo(ts: Date): string {
@@ -56,6 +57,8 @@ export default async function DashboardPage() {
   return (
     <section>
       <DashboardStats total={COMPANIES.length} hot={hotCount} named={namedCount} starred={starCount} won={counts.won} />
+
+      <RegnskabPanel />
 
       <div className="grid-cols">
         <div className="panel-card">

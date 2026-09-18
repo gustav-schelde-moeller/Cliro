@@ -41,16 +41,6 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: process.env.NEXT_PUBLIC_FINANCIAL_DASHBOARD_URL || "https://financial-dashboard-production-5cb5.up.railway.app",
-    label: "Regnskab",
-    external: true,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none">
-        <path d="M4 20V10M10 20V4M16 20v-7M20 20H4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
     href: "/team",
     label: "Team",
     icon: (
@@ -199,22 +189,15 @@ export function Sidebar({
         <TeamSwitcher teamName={teamName} teamId={teamId} userTeams={userTeams} />
       </div>
       <nav className="sidebar-nav">
-        {NAV_ITEMS.map((item) =>
-          item.external ? (
-            <a key={item.href} href={item.href} target="_blank" rel="noopener noreferrer" className="nav-item">
-              {item.icon}
-              <span>{item.label}</span>
-            </a>
-          ) : (
-            <Link key={item.href} href={item.href} className={`nav-item${pathname === item.href ? " active" : ""}`}>
-              {item.icon}
-              <span>{item.label}</span>
-              {item.href === "/virksomheder" ? (
-                <span className="nav-badge">{companyCount}</span>
-              ) : null}
-            </Link>
-          ),
-        )}
+        {NAV_ITEMS.map((item) => (
+          <Link key={item.href} href={item.href} className={`nav-item${pathname === item.href ? " active" : ""}`}>
+            {item.icon}
+            <span>{item.label}</span>
+            {item.href === "/virksomheder" ? (
+              <span className="nav-badge">{companyCount}</span>
+            ) : null}
+          </Link>
+        ))}
       </nav>
       <Link href="/indstillinger" className={`nav-item settings-link${pathname === "/indstillinger" ? " active" : ""}`}>
         <svg viewBox="0 0 24 24" fill="none">

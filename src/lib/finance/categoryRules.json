@@ -1,0 +1,62 @@
+[
+  {
+    "category": "Payroll & Benefits",
+    "keywords": ["LØN", "LON", "ATP OG BARSEL", "ATP - SAMLET", "ATP-SAMLET", "BARSELSORDNING"]
+  },
+  {
+    "category": "Tax",
+    "keywords": ["SKATTEKONTOEN", "AFREGNING TIL TOLD", "SKAT INDDRIVELSE", "GÆLDST. DMI"]
+  },
+  {
+    "category": "Rent & Facilities",
+    "keywords": ["OLAV DE LINDE", "EJD. SEL", "EASYPARK", "PARKERING"]
+  },
+  {
+    "category": "Software & Subscriptions",
+    "keywords": [
+      "ADOBE", "FIGMA", "GOOGLE WORKSPACE", "GOOGLE*WORKSPACE", "SPLICE", "FRAME.IO",
+      "ARTLIST", "VIMEO", "MILANOTE", "YOUTUBE", "ANTHROPIC", "CLAUDE", "E-CONOMIC",
+      "ECONOMIC.DK", "CBB MOBIL", "TELENOR", "HIPER", "FIBIA", "WAOO", "APPLE.COM",
+      "ASSEMBLE, INC", "VERCEL", "GUMROAD", "ELEMENTOR", "PADDLE.NET", "BETTERTOUC",
+      "DISNEY PLUS", "HBOMAX", "NETFLIX", "TIKTOK", "AIRALO", "DAVINCI", "ANDRIK STUDIO"
+    ]
+  },
+  {
+    "category": "Food & Drink",
+    "keywords": [
+      "KANTINEN", "F?TEX", "FOTEX", "FOETEX", "NETTO", "REMA 1000", "REMA1000", "WOLT", "UBER",
+      "CARLS JR", "SHAWARMA", "BILKA", "SUPERBRUGSEN", "LIDL", "JUMBO MINDET",
+      "7-ELEVEN", "MCDTELEFONTORVET", "SALLING GROUP", "MIMOSA", "TURKISH GRILL", "THAI GADE",
+      "SUNSET BLVD", "FALAFEL", "NORMAL ARHUS", "NORMAL ?RHUS", "NORMAL GULDSMED", "HEALTHY FOOD",
+      "INFOTERIA", "TOASTED S", "MORMORS K", "DABBA APS", "FLOS PIZZA", "SUPER BAO", "MR RAMEN",
+      "MEAL4U"
+    ]
+  },
+  {
+    "category": "Travel & Transport",
+    "keywords": [
+      "DSB", "BROBIZZ", "AVIS", "GOMORE", "AIRBNB", "FINNAIR", "TAXI", "TAXA", "BOLT.EU",
+      "CALL ME", "CALLME", "LIME*", "REJSEKORT", "MIDTTRAFIK", "SHELL SERVICE", "Q8 VIBY",
+      "CIRCLE K", "UNO-X", "OSCAR CAR RENT", "BILLIE GMBH", "APP DANTAXI"
+    ]
+  },
+  {
+    "category": "Equipment & Supplies",
+    "keywords": [
+      "SILVAN", "ELGIGANTEN", "PROSHOP", "JYSK", "POWER.DK", "AMAZON", "AMZN", "AMZ*",
+      "HARALD NYBORG", "FIXPART", "AVXPERTEN", "IKEA", "CDON", "KIPON"
+    ]
+  },
+  {
+    "category": "Contractor & Vendor Payments",
+    "keywords": ["MATEUSZ JAKUB KARYS"]
+  },
+  {
+    "category": "Bank Fees & Interest",
+    "keywords": ["GEBYR", "RENTE AF OVERTR"]
+  },
+  {
+    "category": "Loans",
+    "keywords": ["LOAN FROM", "LOAN REPAYMENT"]
+  }
+]
