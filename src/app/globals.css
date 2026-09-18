@@ -596,6 +596,39 @@ input,select{ font-family:inherit; }
 }
 .update-banner .btn{ padding:6px 14px; font-size:12.5px; }
 
+/* ===== regnskab (finance) panel ===== */
+.fin-header-actions{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.fin-tabs{ margin:14px 0 16px; overflow-x:auto; }
+@keyframes finFadeIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+.fin-tab-content{ animation:finFadeIn 0.28s ease both; }
+.fin-grid{ display:grid; grid-template-columns:1.3fr 1fr; gap:24px; }
+@media (max-width:900px){ .fin-grid{ grid-template-columns:1fr; } }
+.fin-chart{ display:flex; flex-direction:column; gap:12px; }
+.fin-chart-legend{ display:flex; gap:16px; font-size:11.5px; color:var(--text-muted); }
+.fin-legend-dot{ display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; }
+.fin-chart-bars{ display:flex; align-items:flex-end; gap:10px; height:170px; overflow-x:auto; padding-bottom:2px; }
+.fin-chart-col{ display:flex; flex-direction:column; align-items:center; gap:6px; flex:0 0 auto; min-width:32px; }
+.fin-chart-bar-pair{ display:flex; align-items:flex-end; gap:3px; height:140px; }
+.fin-bar{ width:11px; border-radius:3px 3px 0 0; transition:height 0.6s cubic-bezier(0.16,1,0.3,1); }
+.fin-chart-month{ font-size:10px; color:var(--text-faint); }
+.kv-row{ display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid var(--border); font-size:12.5px; color:var(--text-muted); gap:10px; }
+.kv-row:last-child{ border-bottom:none; }
+.kv-row b{ color:var(--text); font-family:var(--font-mono); font-weight:600; white-space:nowrap; }
+.kv-row.kv-total{ font-weight:700; }
+.kv-row.kv-total span{ color:var(--text); }
+.money-bd-row{ display:grid; grid-template-columns:150px 1fr 92px; align-items:center; gap:10px; }
+.money-bd-row span{ font-size:12px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.money-bd-row b{ font-family:var(--font-mono); font-size:12px; text-align:right; color:var(--text); }
+.vat-tiles{ display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:10px; }
+.vat-tile{ background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:14px 16px; text-align:center; }
+.vat-tile-label{ font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px; }
+.vat-tile-amount{ font-family:var(--font-mono); font-size:18px; font-weight:700; }
+.vat-tile-refund{ color:var(--good); }
+.vat-tile-caption{ font-size:10.5px; color:var(--text-faint); margin-top:4px; text-transform:uppercase; }
+.salary-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); }
+.salary-row:last-child{ border-bottom:none; }
+.salary-row input{ width:110px; text-align:right; }
+
 @media (max-width:920px){
   .app-active{ padding:0; }
   #appShell{ border-radius:0; grid-template-columns:76px 1fr; min-height:100vh; height:100vh; }
