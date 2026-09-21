@@ -193,7 +193,11 @@ input,select{ font-family:inherit; }
 .member-block-head{ display:flex; align-items:center; gap:9px; margin-bottom:8px; }
 .member-block-head b{ font-size:13.5px; }
 .member-leads{ display:flex; flex-direction:column; gap:6px; margin-left:33px; }
-.member-lead-row{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted); }
+.member-lead-row{
+  display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted); cursor:pointer;
+  border-radius:8px; padding:4px 6px; margin:-4px -6px; transition:background 0.1s ease;
+}
+.member-lead-row:hover{ background:var(--surface-2); }
 
 /* ===== avatar upload ===== */
 .avatar-upload-row{ display:flex; align-items:center; gap:10px; }

@@ -233,7 +233,7 @@ export function TeamView({
               {m.leads.length > 0 || m.cvrLeads.length > 0 ? (
                 <div className="member-leads">
                   {m.leads.map((l) => (
-                    <div className="member-lead-row" key={l.id}>
+                    <div className="member-lead-row" key={l.id} onClick={() => router.push(`/virksomheder?open=${l.id}`)}>
                       <span className="status-pill" data-status={l.status}>
                         {statusLabel(l.status)}
                       </span>
@@ -242,7 +242,7 @@ export function TeamView({
                     </div>
                   ))}
                   {m.cvrLeads.map((l) => (
-                    <div className="member-lead-row" key={l.cvrNummer}>
+                    <div className="member-lead-row" key={l.cvrNummer} onClick={() => router.push(`/virksomheder?cvr=${l.cvrNummer}`)}>
                       <span className="status-pill" data-status={l.status}>
                         {statusLabel(l.status)}
                       </span>
@@ -265,7 +265,7 @@ export function TeamView({
         ) : (
           publicLists.map((l, i) => (
             <div className="panel-card list-card-anim" style={{ marginTop: i === 0 ? 0 : 10, animationDelay: `${Math.min(i, 8) * 40}ms` }} key={l.id}>
-              <div className="list-header-row">
+              <div className="list-header-row" onClick={() => router.push(`/lister?list=${l.id}`)}>
                 <div className="list-header-title">
                   <h3 className="list-name-link">{l.name}</h3>
                   <span className="tag">
