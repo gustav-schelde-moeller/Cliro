@@ -43,18 +43,29 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     views: [{ state: "frozen", ySplit: 1 }],
   });
 
+  // One sheet for both AI leads and CVR-search companies — an earlier
+  // version put CVR rows on a separate "CVR" tab, which was easy to miss
+  // entirely (a person opening the file just sees the first sheet). Score
+  // vs Købekraft and Kontaktperson vs Telefon are kept as separate columns
+  // rather than merged into one ambiguous column — same reasoning as the
+  // in-app list table, which splits these for the same two row types.
   sheet.columns = [
-    { header: "Navn", key: "name", width: 26 },
-    { header: "Branche", key: "industry", width: 20 },
+    { header: "Navn", key: "name", width: 28 },
+    { header: "Branche", key: "industry", width: 24 },
     { header: "By", key: "city", width: 16 },
     { header: "Score", key: "score", width: 9 },
+    { header: "Købekraft", key: "koebekraft", width: 11 },
     { header: "Kontaktperson", key: "contactName", width: 22 },
-    { header: "Titel", key: "contactTitle", width: 22 },
+    { header: "Titel", key: "contactTitle", width: 20 },
+    { header: "Telefon", key: "telefon", width: 15 },
     { header: "Email", key: "email", width: 30 },
-    { header: "Note", key: "note", width: 34 },
+    { header: "CVR-nummer", key: "cvrNummer", width: 13 },
+    { header: "Ansatte", key: "employees", width: 9 },
+    { header: "Adresse", key: "adresse", width: 26 },
+    { header: "Note", key: "note", width: 30 },
     { header: "Hjemmeside", key: "website", width: 22 },
-    { header: "Nyhed", key: "hook", width: 40 },
-    { header: "Nyhedsdato", key: "hookDate", width: 18 },
+    { header: "Nyhed", key: "hook", width: 36 },
+    { header: "Nyhedsdato", key: "hookDate", width: 16 },
   ];
 
   // Spreadsheet apps render on a white canvas regardless of the viewer's own
@@ -69,80 +80,60 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   headerRow.height = 22;
   sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: sheet.columns.length } };
 
-  companies.forEach((c, i) => {
-    const row = sheet.addRow({
+  companies.forEach((c) => {
+    sheet.addRow({
       name: c.name,
       industry: c.industry,
       city: c.city,
       score: displayScore(c),
+      koebekraft: "",
       contactName: c.contact.name ?? "",
       contactTitle: c.contact.title ?? "",
+      telefon: "",
       email: c.contact.email ?? "",
+      cvrNummer: "",
+      employees: "",
+      adresse: "",
       note: c.contact.note ?? "",
       website: c.website,
       hook: c.hook.title,
       hookDate: c.hook.date,
     });
+  });
+
+  cvrItems.forEach(({ company: c }) => {
+    sheet.addRow({
+      name: c.navn ?? "",
+      industry: c.brancheTekst ?? "",
+      city: c.region ?? "",
+      score: "",
+      koebekraft: c.koebekraftScore ?? "",
+      contactName: "",
+      contactTitle: "",
+      telefon: c.telefon ?? "",
+      email: c.email ?? "",
+      cvrNummer: c.cvrNummer,
+      employees: c.employees ?? "",
+      adresse: [c.vejnavn, c.husnummer].filter(Boolean).join(" "),
+      note: "",
+      website: "",
+      hook: "",
+      hookDate: "",
+    });
+  });
+
+  sheet.eachRow((row, i) => {
+    if (i === 1) return;
     row.font = { color: { argb: "FF1A1D24" } };
     row.alignment = { vertical: "top", wrapText: true };
     row.height = 30;
-    if (i % 2 === 1) {
+    if (i % 2 === 0) {
       row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F3F5" } };
     }
-  });
-
-  sheet.eachRow((row) => {
     row.eachCell((cell) => {
-      cell.border = {
-        bottom: { style: "thin", color: { argb: "FFE2E5E9" } },
-      };
+      cell.border = { bottom: { style: "thin", color: { argb: "FFE2E5E9" } } };
     });
   });
-
-  if (cvrItems.length > 0) {
-    const cvrSheet = workbook.addWorksheet("CVR", { views: [{ state: "frozen", ySplit: 1 }] });
-    cvrSheet.columns = [
-      { header: "CVR-nummer", key: "cvrNummer", width: 14 },
-      { header: "Navn", key: "navn", width: 28 },
-      { header: "Branche", key: "brancheTekst", width: 24 },
-      { header: "Region", key: "region", width: 16 },
-      { header: "Ansatte", key: "employees", width: 10 },
-      { header: "Købekraft", key: "koebekraftScore", width: 11 },
-      { header: "Email", key: "email", width: 30 },
-      { header: "Telefon", key: "telefon", width: 16 },
-      { header: "Adresse", key: "adresse", width: 30 },
-    ];
-    const cvrHeaderRow = cvrSheet.getRow(1);
-    cvrHeaderRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    cvrHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2F55FC" } };
-    cvrHeaderRow.alignment = { vertical: "middle" };
-    cvrHeaderRow.height = 22;
-    cvrSheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cvrSheet.columns.length } };
-
-    cvrItems.forEach(({ company: c }, i) => {
-      const row = cvrSheet.addRow({
-        cvrNummer: c.cvrNummer,
-        navn: c.navn ?? "",
-        brancheTekst: c.brancheTekst ?? "",
-        region: c.region ?? "",
-        employees: c.employees ?? "",
-        koebekraftScore: c.koebekraftScore ?? "",
-        email: c.email ?? "",
-        telefon: c.telefon ?? "",
-        adresse: [c.vejnavn, c.husnummer].filter(Boolean).join(" "),
-      });
-      row.font = { color: { argb: "FF1A1D24" } };
-      row.alignment = { vertical: "top", wrapText: true };
-      if (i % 2 === 1) {
-        row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F3F5" } };
-      }
-    });
-    cvrSheet.eachRow((row) => {
-      row.eachCell((cell) => {
-        cell.border = { bottom: { style: "thin", color: { argb: "FFE2E5E9" } } };
-      });
-    });
-  }
 
   const buffer = await workbook.xlsx.writeBuffer();
   const safeName = list.name.replace(/[^\p{L}\p{N}_-]+/gu, "_") || "Liste";
