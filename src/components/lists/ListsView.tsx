@@ -256,6 +256,7 @@ export function ListsView({
                             <th>Branche</th>
                             <th>By</th>
                             <th>Score</th>
+                            <th>Købekraft</th>
                             <th>Kontakt</th>
                             <th>Email</th>
                             <th />
@@ -268,6 +269,7 @@ export function ListsView({
                               <td>{c.industry}</td>
                               <td>{c.city}</td>
                               <td>{c.score}</td>
+                              <td>—</td>
                               <td>{c.contact.name ?? "—"}</td>
                               <td>{c.contact.email ?? "—"}</td>
                               <td>
@@ -290,6 +292,7 @@ export function ListsView({
                               <td>{c.navn || "Ukendt navn"}</td>
                               <td>{c.brancheTekst ?? "—"}</td>
                               <td>{c.kommunenavn ?? "—"}</td>
+                              <td>—</td>
                               <td>{c.koebekraftScore ?? "—"}</td>
                               <td>{c.telefon ?? "—"}</td>
                               <td>{c.email ?? "—"}</td>
