@@ -192,10 +192,10 @@ input,select{ font-family:inherit; }
 .member-block:last-child{ border-bottom:none; }
 .member-block-head{ display:flex; align-items:center; gap:9px; margin-bottom:8px; }
 .member-block-head b{ font-size:13.5px; }
-.member-leads{ display:flex; flex-direction:column; gap:6px; margin-left:33px; }
+.member-leads{ display:flex; flex-direction:column; gap:6px; margin-left:33px; min-width:0; }
 .member-lead-row{
   display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted); cursor:pointer;
-  border-radius:8px; padding:4px 6px; margin:-4px -6px; transition:background 0.1s ease;
+  border-radius:8px; padding:4px 6px; margin:-4px -6px; transition:background 0.1s ease; flex-wrap:wrap; min-width:0;
 }
 .member-lead-row:hover{ background:var(--surface-2); }
 
@@ -557,6 +557,8 @@ input,select{ font-family:inherit; }
   border-radius:8px; margin:0 -8px; padding:9px 8px; width:calc(100% + 16px);
 }
 .inprogress-row-clickable:hover{ background:var(--surface-2); }
+.inprogress-tabs{ flex-wrap:wrap; margin-bottom:12px; }
+.inprogress-tabs button{ white-space:nowrap; }
 
 /* ===== profil page ===== */
 .profil-row{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 0; border-bottom:1px solid var(--border); }
@@ -667,6 +669,23 @@ input,select{ font-family:inherit; }
   .topbar h1{ font-size:18px; }
   .topbar-who span{ display:none; }
   .pages{ padding:18px 16px 40px; }
+
+  /* The 76px icon-only side column (see the 920px rules above) becomes a
+     horizontal bar across the top instead — same icon-only nav items, just
+     laid out in a row so phone width goes to page content instead of a
+     side rail. */
+  #appShell{ grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+  .sidebar{
+    flex-direction:row; align-items:center; padding:8px 10px; gap:6px;
+    border-right:none; border-bottom:1px solid var(--border); overflow-x:auto;
+  }
+  .sidebar-brand{ padding:0; flex-shrink:0; }
+  .sidebar-brand-mark{ width:30px; height:30px; }
+  .sidebar-brand-mark svg{ width:22px; height:22px; }
+  .team-switcher{ width:auto; flex:none; }
+  .sidebar-nav{ flex-direction:row; flex:none; gap:2px; }
+  .nav-item{ flex-direction:column; gap:2px; padding:6px 9px; white-space:nowrap; flex-shrink:0; width:auto; }
+  .settings-link{ margin-top:0; border-top:none; padding-top:0; margin-left:2px; flex-shrink:0; width:auto; }
 }
 
 @media (max-width:560px){

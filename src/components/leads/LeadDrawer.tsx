@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { Company } from "@/lib/companies";
+import { scoreFreshness, type Company } from "@/lib/companies";
 import { STATUS_DEFS, statusLabel } from "@/lib/status";
 import type { LeadState } from "./LeadCard";
 import { ListMenu, type TeamListOption } from "./ListMenu";
 import { useToast } from "@/components/shared/ToastProvider";
 
-function BdRow({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+function BdRow({ label, value, max, color, display }: { label: string; value: number; max: number; color: string; display?: string }) {
   const pct = Math.round((value / max) * 100);
   return (
     <div className="bd-row">
@@ -15,9 +15,7 @@ function BdRow({ label, value, max, color }: { label: string; value: number; max
       <div className="bd-track">
         <div className="bd-fill" style={{ width: `${pct}%`, background: color }} />
       </div>
-      <b>
-        {value}/{max}
-      </b>
+      <b>{display ?? `${value}/${max}`}</b>
     </div>
   );
 }
@@ -148,6 +146,13 @@ export function LeadDrawer({
             <BdRow label="Nyhedsvinkel" value={company.breakdown.news} max={35} color="var(--hot)" />
             <BdRow label="Branche-fit" value={company.breakdown.industry} max={20} color="var(--cool)" />
             <BdRow label="Kreativt potentiale" value={company.breakdown.creative} max={15} color="var(--star)" />
+            <BdRow
+              label="Aktualitet"
+              value={scoreFreshness(company)}
+              max={100}
+              color="var(--good)"
+              display={`${scoreFreshness(company)}%`}
+            />
           </div>
 
           <div className="section-label">Vinklen — hvorfor nu</div>

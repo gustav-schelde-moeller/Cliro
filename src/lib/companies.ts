@@ -112,6 +112,16 @@ function parseDanishDate(text: string): Date | null {
 const SCORE_HALF_LIFE_DAYS = 45;
 const SCORE_DECAY_FLOOR = 15;
 
+// Shared by displayScore and scoreFreshness below — both are functions of
+// the same age-based decay curve, just applied differently (one decays the
+// score toward a floor, the other reports the raw decay factor itself as
+// "how fresh is this news").
+function decayFactor(company: Pick<Company, "hook" | "createdAt">, now: Date): number {
+  const anchor = parseDanishDate(company.hook.date) ?? new Date(company.createdAt);
+  const ageDays = Math.max(0, (now.getTime() - anchor.getTime()) / 86_400_000);
+  return Math.pow(0.5, ageDays / SCORE_HALF_LIFE_DAYS);
+}
+
 // A lead's score should reflect how good a reason it is to reach out TODAY —
 // a hot news angle from 6 months ago isn't hot anymore, even if the
 // research score was high when it was first found. Score decays with a
@@ -121,11 +131,28 @@ const SCORE_DECAY_FLOOR = 15;
 // date, or to createdAt (when the lead was found) otherwise. The original
 // `score` field is left untouched as the historical research record.
 export function displayScore(company: Pick<Company, "score" | "hook" | "createdAt">, now: Date = new Date()): number {
-  const anchor = parseDanishDate(company.hook.date) ?? new Date(company.createdAt);
-  const ageDays = Math.max(0, (now.getTime() - anchor.getTime()) / 86_400_000);
-  const decay = Math.pow(0.5, ageDays / SCORE_HALF_LIFE_DAYS);
-  const decayed = SCORE_DECAY_FLOOR + (company.score - SCORE_DECAY_FLOOR) * decay;
+  const decayed = SCORE_DECAY_FLOOR + (company.score - SCORE_DECAY_FLOOR) * decayFactor(company, now);
   return Math.round(Math.max(0, Math.min(100, decayed)));
+}
+
+// How new the news hook itself is, as a 0-100 freshness percentage on the
+// same half-life curve displayScore decays by — shown as its own bar in the
+// drawer's score breakdown, separately from the decayed score, since "how
+// current is this" is worth seeing on its own rather than only folded into
+// one number.
+export function scoreFreshness(company: Pick<Company, "hook" | "createdAt">, now: Date = new Date()): number {
+  return Math.round(Math.max(0, Math.min(1, decayFactor(company, now))) * 100);
+}
+
+// Same hot/warm/cool tier thresholds the research AI itself uses when first
+// assigning a company's (static) tier — but applied to the *current*,
+// decayed score, so a card's color always matches what displayScore is
+// showing right now instead of freezing at whatever tier it had when a
+// stale news hook was fresh.
+export function displayTier(score: number): Tier {
+  if (score >= 85) return "hot";
+  if (score >= 70) return "warm";
+  return "cool";
 }
 
 export async function getCompanyById(id: number): Promise<Company | undefined> {

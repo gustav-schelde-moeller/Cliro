@@ -22,36 +22,16 @@ function AnimatedNumber({ target }: { target: number }) {
   return <b>{value}</b>;
 }
 
-export function DashboardStats({
-  total,
-  hot,
-  named,
-  starred,
-  won,
-}: {
-  total: number;
-  hot: number;
-  named: number;
-  starred: number;
-  won: number;
-}) {
+export function DashboardStats({ total, hot, won }: { total: number; hot: number; won: number }) {
   return (
     <div className="stat-grid">
       <div className="stat-card">
         <AnimatedNumber target={total} />
-        <span>Klienter i alt</span>
+        <span>I pipelinen</span>
       </div>
       <div className="stat-card">
         <AnimatedNumber target={hot} />
         <span>Varme leads</span>
-      </div>
-      <div className="stat-card">
-        <AnimatedNumber target={named} />
-        <span>Navngivet kontakt</span>
-      </div>
-      <div className="stat-card">
-        <AnimatedNumber target={starred} />
-        <span>Stjernemarkeret</span>
       </div>
       <div className="stat-card">
         <AnimatedNumber target={won} />

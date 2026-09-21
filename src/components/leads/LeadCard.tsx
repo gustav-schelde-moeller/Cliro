@@ -1,6 +1,6 @@
 "use client";
 
-import { displayScore, type Company } from "@/lib/companies";
+import { displayScore, displayTier, type Company } from "@/lib/companies";
 import { statusLabel } from "@/lib/status";
 import { ListMenu, type TeamListOption } from "./ListMenu";
 
@@ -71,7 +71,7 @@ export function LeadCard({
         onToggleList={onToggleList}
         onCreateList={onCreateList}
       />
-      <div className={`score-badge tier-${company.tier.key}`}>
+      <div className={`score-badge tier-${displayTier(displayScore(company))}`}>
         <b>{displayScore(company)}</b>
         <span>score</span>
       </div>

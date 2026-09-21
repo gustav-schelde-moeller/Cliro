@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/shared/Avatar";
+import { Modal } from "@/components/shared/Modal";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
 import { statusLabel } from "@/lib/status";
 import { inviteEmailAction, removeMemberAction, setRoleAction, type ActionResult } from "@/lib/actions/team-actions";
@@ -92,6 +93,16 @@ export function TeamView({
   const [cvrRows, setCvrRows] = useState<CvrCompanyRow[]>(allCvrCompanies);
   const [selectedCvr, setSelectedCvr] = useState<CvrCompanyRow | null>(null);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [expandedMembers, setExpandedMembers] = useState<Set<string>>(new Set());
+
+  function toggleMemberExpanded(userId: string) {
+    setExpandedMembers((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
 
   const {
     starred,
@@ -162,6 +173,8 @@ export function TeamView({
     }
   }
 
+  const [confirmRemove, setConfirmRemove] = useState<{ userId: string; name: string } | null>(null);
+
   function handleRemove(userId: string) {
     startTransition(async () => {
       try {
@@ -169,6 +182,8 @@ export function TeamView({
         router.refresh();
       } catch (err) {
         showToast(errorMessage(err, "Kunne ikke fjerne medlemmet."));
+      } finally {
+        setConfirmRemove(null);
       }
     });
   }
@@ -273,7 +288,11 @@ export function TeamView({
                       )
                     ) : null}
                     {isAdmin && !m.isOwner && m.userId !== myUserId ? (
-                      <button className="role-btn" disabled={isPending} onClick={() => handleRemove(m.userId)}>
+                      <button
+                        className="role-btn"
+                        disabled={isPending}
+                        onClick={() => setConfirmRemove({ userId: m.userId, name: m.name })}
+                      >
                         Fjern
                       </button>
                     ) : null}
@@ -308,38 +327,61 @@ export function TeamView({
         {members.length === 0 ? (
           <div className="dash-empty">Ingen teammedlemmer endnu.</div>
         ) : (
-          members.map((m) => (
-            <div className="member-block" key={m.userId}>
-              <div className="member-block-head">
-                <Avatar name={m.name} avatarDataUrl={m.avatarDataUrl} size="sm" />
-                <b>{m.name}</b>
-                <span className="tag">{m.leads.length + m.cvrLeads.length} tildelt</span>
-              </div>
-              {m.leads.length > 0 || m.cvrLeads.length > 0 ? (
-                <div className="member-leads">
-                  {m.leads.map((l) => (
-                    <div className="member-lead-row" key={l.id} onClick={() => setSelectedId(l.id)}>
-                      <span className="status-pill" data-status={l.status}>
-                        {statusLabel(l.status)}
-                      </span>
-                      <span>{l.name}</span>
-                      <span className="tag">{l.industry}</span>
-                    </div>
-                  ))}
-                  {m.cvrLeads.map((l) => (
-                    <div className="member-lead-row" key={l.cvrNummer} onClick={() => openCvrByNummer(l.cvrNummer)}>
-                      <span className="status-pill" data-status={l.status}>
-                        {statusLabel(l.status)}
-                      </span>
-                      <span className="tag">CVR</span>
-                      <span>{l.name}</span>
-                      <span className="tag">{l.industry}</span>
-                    </div>
-                  ))}
+          members.map((m) => {
+            const memberTotal = m.leads.length + m.cvrLeads.length;
+            const isExpanded = expandedMembers.has(m.userId);
+            return (
+              <div className="member-block" key={m.userId}>
+                <div
+                  className="member-block-head"
+                  onClick={() => memberTotal > 0 && toggleMemberExpanded(m.userId)}
+                  style={memberTotal > 0 ? { cursor: "pointer" } : undefined}
+                >
+                  {memberTotal > 0 ? (
+                    <svg
+                      className={`list-chevron${isExpanded ? " open" : ""}`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      width={14}
+                      height={14}
+                    >
+                      <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : null}
+                  <Avatar name={m.name} avatarDataUrl={m.avatarDataUrl} size="sm" />
+                  <b>{m.name}</b>
+                  <span className="tag">{memberTotal} tildelt</span>
                 </div>
-              ) : null}
-            </div>
-          ))
+                {memberTotal > 0 ? (
+                  <div className={`list-body-wrap${isExpanded ? " expanded" : ""}`}>
+                    <div>
+                      <div className="member-leads">
+                        {m.leads.map((l) => (
+                          <div className="member-lead-row" key={l.id} onClick={() => setSelectedId(l.id)}>
+                            <span className="status-pill" data-status={l.status}>
+                              {statusLabel(l.status)}
+                            </span>
+                            <span>{l.name}</span>
+                            <span className="tag">{l.industry}</span>
+                          </div>
+                        ))}
+                        {m.cvrLeads.map((l) => (
+                          <div className="member-lead-row" key={l.cvrNummer} onClick={() => openCvrByNummer(l.cvrNummer)}>
+                            <span className="status-pill" data-status={l.status}>
+                              {statusLabel(l.status)}
+                            </span>
+                            <span className="tag">CVR</span>
+                            <span>{l.name}</span>
+                            <span className="tag">{l.industry}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
         )}
       </div>
 
@@ -376,6 +418,23 @@ export function TeamView({
       </div>
 
       <div className="footer-note">Den første person i et team er automatisk ejer og kan gøre andre til admin herfra.</div>
+
+      {confirmRemove ? (
+        <Modal title={`Fjern ${confirmRemove.name}?`} onClose={() => setConfirmRemove(null)}>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted)" }}>
+            {confirmRemove.name} fjernes fra teamet med det samme. Alle lister {confirmRemove.name} har oprettet, og alle
+            virksomheder tildelt {confirmRemove.name}, forsvinder også permanent — det kan ikke fortrydes.
+          </p>
+          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+            <button type="button" className="btn" onClick={() => setConfirmRemove(null)}>
+              Annullér
+            </button>
+            <button type="button" className="btn danger" disabled={isPending} onClick={() => handleRemove(confirmRemove.userId)}>
+              Ja, fjern permanent
+            </button>
+          </div>
+        </Modal>
+      ) : null}
 
       {selectedList ? (
         <TeamListDrawer

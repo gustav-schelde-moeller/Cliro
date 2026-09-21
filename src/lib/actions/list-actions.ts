@@ -63,7 +63,10 @@ export async function deleteListAction(teamId: string, listId: string) {
   const user = await requireUser();
   await requireMembership(teamId, user.id);
   const list = await requireListInTeam(teamId, listId);
-  requireListAccess(list, user.id);
+  // Deliberately stricter than requireListAccess: teamCanEdit only opens up
+  // editing a list's *contents*, never deleting the list itself — that
+  // stays the creator's call regardless of that toggle.
+  if (list.createdBy !== user.id) throw new Error("Kun listens ejer kan slette den.");
 
   await prisma.companyList.delete({ where: { id: listId } });
   await prisma.activityLog.create({

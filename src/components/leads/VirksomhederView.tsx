@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { displayScore, haversineKm, type Company } from "@/lib/companies";
+import { displayScore, displayTier, haversineKm, type Company } from "@/lib/companies";
 import { LeadCard, type LeadState, type TeamListOption } from "./LeadCard";
 import { LeadDrawer } from "./LeadDrawer";
 import { useLeadMutations } from "./useLeadMutations";
@@ -88,7 +88,7 @@ export function VirksomhederView({
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     const list = companies.filter((c) => {
-      if (tier !== "all" && c.tier.key !== tier) return false;
+      if (tier !== "all" && displayTier(displayScore(c)) !== tier) return false;
       if (industries.size && !industries.has(c.industry)) return false;
       if (named && !c.contact.found) return false;
       if (directEmail && !c.contact.email) return false;
@@ -255,7 +255,7 @@ export function VirksomhederView({
                     resetPaging();
                   }}
                 >
-                  {t.label} ({t.key === "all" ? companies.length : companies.filter((c) => c.tier.key === t.key).length})
+                  {t.label} ({t.key === "all" ? companies.length : companies.filter((c) => displayTier(displayScore(c)) === t.key).length})
                 </button>
               ))}
             </div>

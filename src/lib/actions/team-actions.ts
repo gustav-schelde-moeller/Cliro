@@ -153,9 +153,14 @@ export async function removeMemberAction(teamId: string, targetUserId: string) {
 
   const target = await prisma.user.findUnique({ where: { id: targetUserId } });
   await prisma.teamMember.delete({ where: { teamId_userId: { teamId, userId: targetUserId } } });
-  await prisma.lead.updateMany({ where: { teamId, assigneeId: targetUserId }, data: { assigneeId: null } });
-  await prisma.cvrTeamLead.updateMany({ where: { teamId, assigneeId: targetUserId }, data: { assigneeId: null } });
-  await prisma.companyList.updateMany({ where: { teamId, createdBy: targetUserId, isPrivate: true }, data: { isPrivate: false } });
+  // Removing someone from the team also removes what only existed because
+  // they were tracking it — every list they created (cascade-deletes its
+  // items too) and any pipeline entry they were the assignee on, not just
+  // the assignment itself. The confirmation dialog before this call warns
+  // about exactly that.
+  await prisma.companyList.deleteMany({ where: { teamId, createdBy: targetUserId } });
+  await prisma.lead.deleteMany({ where: { teamId, assigneeId: targetUserId } });
+  await prisma.cvrTeamLead.deleteMany({ where: { teamId, assigneeId: targetUserId } });
   await prisma.activityLog.create({
     data: {
       teamId,
@@ -165,6 +170,9 @@ export async function removeMemberAction(teamId: string, targetUserId: string) {
     },
   });
   revalidatePath("/team");
+  revalidatePath("/lister");
+  revalidatePath("/virksomheder");
+  revalidatePath("/dashboard");
 }
 
 export async function setRoleAction(teamId: string, targetUserId: string, makeAdmin: boolean) {

@@ -172,13 +172,19 @@ export function Sidebar({
   teamId,
   userTeams,
   companyCount,
+  isAdmin,
 }: {
   teamName: string;
   teamId: string;
   userTeams: { id: string; name: string }[];
   companyCount: number;
+  // Dashboard shows the team's financial/pipeline picture — confidential
+  // enough that regular members shouldn't even see the link, not just get
+  // bounced if they guess the URL.
+  isAdmin: boolean;
 }) {
   const pathname = usePathname();
+  const navItems = isAdmin ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.href !== "/dashboard");
 
   return (
     <aside className="sidebar">
@@ -189,7 +195,7 @@ export function Sidebar({
         <TeamSwitcher teamName={teamName} teamId={teamId} userTeams={userTeams} />
       </div>
       <nav className="sidebar-nav">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <Link key={item.href} href={item.href} className={`nav-item${pathname === item.href ? " active" : ""}`}>
             {item.icon}
             <span>{item.label}</span>
