@@ -173,7 +173,12 @@ model CompanyList {
   name      String
   createdBy String
   isPrivate Boolean  @default(false)
-  createdAt DateTime @default(now())
+  // Whether teammates other than the owner can add/remove companies on a
+  // visible (non-private) list — separate from isPrivate, which controls
+  // who can even see it. Defaults true so existing public lists keep their
+  // current behavior (any team member could already edit them).
+  teamCanEdit Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
   team     Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
   items    CompanyListItem[]

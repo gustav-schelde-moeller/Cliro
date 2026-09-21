@@ -11,6 +11,15 @@ export const SORT_WHITELIST = new Set([
   "koebekraftScore",
 ]);
 
+// "status" is handled separately (see /api/cvr/companies) — it isn't a
+// column on CvrCompany at all, it's this team's CvrTeamLead.status, so a
+// plain Prisma orderBy can't reach it the way it reaches the columns above.
+export const STATUS_SORT_KEY = "status";
+export const STATUS_RANK: Record<string, number> = { new: 0, contacted: 1, meeting: 2, won: 3, lost: 4 };
+export function statusRank(status: string | undefined): number {
+  return status != null ? (STATUS_RANK[status] ?? 0) : 0;
+}
+
 // Denmark's 5 administrative regions, by kommunekode. Verbatim port of the
 // handed-off cvr-tool's REGIONS table (verified against the actual
 // kommunekode/kommunenavn pairs present in the data). CvrCompany.region is

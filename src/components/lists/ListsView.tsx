@@ -7,6 +7,9 @@ import type { LeadState } from "@/components/leads/LeadCard";
 import type { TeamListOption } from "@/components/leads/ListMenu";
 import { LeadDrawer } from "@/components/leads/LeadDrawer";
 import { useLeadMutations } from "@/components/leads/useLeadMutations";
+import { CvrDrawer } from "@/components/leads/CvrDrawer";
+import { useCvrRowMutations } from "@/components/leads/useCvrRowMutations";
+import type { CvrCompanyRow } from "@/components/leads/CvrBrowser";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
 import {
   createListAction,
@@ -14,6 +17,7 @@ import {
   toggleCompanyInListAction,
   toggleCvrCompanyInListAction,
   toggleListVisibilityAction,
+  toggleListTeamEditAction,
 } from "@/lib/actions/list-actions";
 import { ListActionsMenu } from "./ListActionsMenu";
 
@@ -33,6 +37,7 @@ type ListItem = {
   createdAt: string;
   createdByName: string | null;
   isPrivate: boolean;
+  teamCanEdit: boolean;
   isMine: boolean;
   companies: Company[];
   cvrCompanies: CvrListCompany[];
@@ -46,6 +51,7 @@ export function ListsView({
   initialStars,
   initialTeamLists,
   initialListMemberships,
+  allCvrCompanies,
 }: {
   teamId: string;
   myName: string;
@@ -54,6 +60,7 @@ export function ListsView({
   initialStars: number[];
   initialTeamLists: TeamListOption[];
   initialListMemberships: Record<number, string[]>;
+  allCvrCompanies: CvrCompanyRow[];
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -63,6 +70,8 @@ export function ListsView({
   const [creating, setCreating] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [cvrRows, setCvrRows] = useState<CvrCompanyRow[]>(allCvrCompanies);
+  const [selectedCvr, setSelectedCvr] = useState<CvrCompanyRow | null>(null);
 
   const {
     starred,
@@ -77,12 +86,29 @@ export function ListsView({
     handleCreateList,
   } = useLeadMutations({ teamId, myName, initialLeads, initialStars, initialTeamLists, initialListMemberships });
 
+  const {
+    teamLists: cvrTeamLists,
+    analyzingFor,
+    handleSetStatus: handleCvrSetStatus,
+    handleAssign: handleCvrAssign,
+    handleRelease: handleCvrRelease,
+    handleToggleStar: handleCvrToggleStar,
+    handleToggleList: handleCvrToggleList,
+    handleCreateList: handleCvrCreateList,
+    handleAnalyze,
+  } = useCvrRowMutations({ teamId, myName, initialTeamLists, setRows: setCvrRows, setSelected: setSelectedCvr });
+
   const companyById = useMemo(() => {
     const map = new Map<number, Company>();
     for (const list of lists) for (const c of list.companies) map.set(c.id, c);
     return map;
   }, [lists]);
   const selectedCompany = selectedId != null ? companyById.get(selectedId) ?? null : null;
+
+  function openCvrByNummer(cvrNummer: string) {
+    const match = cvrRows.find((r) => r.cvrNummer === cvrNummer);
+    if (match) setSelectedCvr(match);
+  }
 
   function toggleExpanded(id: string) {
     setExpandedIds((prev) => {
@@ -127,6 +153,17 @@ export function ListsView({
         router.refresh();
       } catch (err) {
         showToast(errorMessage(err, "Kunne ikke ændre synligheden."));
+      }
+    });
+  }
+
+  function handleToggleTeamEdit(listId: string) {
+    startTransition(async () => {
+      try {
+        await toggleListTeamEditAction(teamId, listId);
+        router.refresh();
+      } catch (err) {
+        showToast(errorMessage(err, "Kunne ikke ændre redigeringsadgangen."));
       }
     });
   }
@@ -205,6 +242,7 @@ export function ListsView({
       ) : (
         lists.map((list, i) => {
           const isExpanded = expandedIds.has(list.id);
+          const canEdit = list.isMine || (!list.isPrivate && list.teamCanEdit);
           return (
             <div
               className="panel-card list-card-anim"
@@ -234,7 +272,9 @@ export function ListsView({
                     listName={list.name}
                     isPrivate={list.isPrivate}
                     isMine={list.isMine}
+                    teamCanEdit={list.teamCanEdit}
                     onToggleVisibility={() => handleToggleVisibility(list.id)}
+                    onToggleTeamEdit={() => handleToggleTeamEdit(list.id)}
                     onDelete={() => handleDelete(list.id)}
                   />
                 </div>
@@ -266,7 +306,7 @@ export function ListsView({
                         <tbody>
                           {list.companies.map((c) => (
                             <tr key={`lead-${c.id}`} className="list-table-row" onClick={() => setSelectedId(c.id)}>
-                              <td>{c.name}</td>
+                              <td className="cell-primary">{c.name}</td>
                               <td>{c.industry}</td>
                               <td>{c.city}</td>
                               <td>{displayScore(c)}</td>
@@ -275,42 +315,56 @@ export function ListsView({
                               <td>—</td>
                               <td>{c.contact.email ?? "—"}</td>
                               <td>
-                                <button
-                                  type="button"
-                                  className="btn"
-                                  disabled={isPending}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveCompany(list.id, c.id);
-                                  }}
-                                >
-                                  Fjern
-                                </button>
+                                {canEdit ? (
+                                  <button
+                                    type="button"
+                                    className="btn"
+                                    disabled={isPending}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveCompany(list.id, c.id);
+                                    }}
+                                  >
+                                    Fjern
+                                  </button>
+                                ) : null}
                               </td>
                             </tr>
                           ))}
-                          {list.cvrCompanies.map((c) => (
-                            <tr key={`cvr-${c.cvrNummer}`} className="list-table-row">
-                              <td>{c.navn || "Ukendt navn"}</td>
-                              <td>{c.brancheTekst ?? "—"}</td>
-                              <td>{c.kommunenavn ?? "—"}</td>
-                              <td>—</td>
-                              <td>{c.koebekraftScore ?? "—"}</td>
-                              <td>—</td>
-                              <td>{c.telefon ?? "—"}</td>
-                              <td>{c.email ?? "—"}</td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="btn"
-                                  disabled={isPending}
-                                  onClick={() => handleRemoveCvrCompany(list.id, c.cvrNummer)}
-                                >
-                                  Fjern
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                          {list.cvrCompanies.map((c) => {
+                            const openable = cvrRows.some((r) => r.cvrNummer === c.cvrNummer);
+                            return (
+                              <tr
+                                key={`cvr-${c.cvrNummer}`}
+                                className={`list-table-row${openable ? "" : " list-table-row-disabled"}`}
+                                onClick={openable ? () => openCvrByNummer(c.cvrNummer) : undefined}
+                              >
+                                <td className="cell-primary">{c.navn || "Ukendt navn"}</td>
+                                <td>{c.brancheTekst ?? "—"}</td>
+                                <td>{c.kommunenavn ?? "—"}</td>
+                                <td>—</td>
+                                <td>{c.koebekraftScore ?? "—"}</td>
+                                <td>—</td>
+                                <td>{c.telefon ?? "—"}</td>
+                                <td>{c.email ?? "—"}</td>
+                                <td>
+                                  {canEdit ? (
+                                    <button
+                                      type="button"
+                                      className="btn"
+                                      disabled={isPending}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveCvrCompany(list.id, c.cvrNummer);
+                                      }}
+                                    >
+                                      Fjern
+                                    </button>
+                                  ) : null}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -337,6 +391,23 @@ export function ListsView({
           onRelease={() => handleRelease(selectedCompany.id)}
           onToggleList={(listId) => handleToggleList(selectedCompany.id, listId)}
           onCreateList={(name) => handleCreateList(selectedCompany.id, name)}
+        />
+      ) : null}
+
+      {selectedCvr ? (
+        <CvrDrawer
+          company={selectedCvr}
+          myName={myName}
+          teamLists={cvrTeamLists}
+          analyzing={analyzingFor === selectedCvr.cvrNummer}
+          onClose={() => setSelectedCvr(null)}
+          onToggleStar={() => handleCvrToggleStar(selectedCvr)}
+          onSetStatus={(status) => handleCvrSetStatus(selectedCvr, status)}
+          onAssign={() => handleCvrAssign(selectedCvr)}
+          onRelease={() => handleCvrRelease(selectedCvr)}
+          onToggleList={(listId) => handleCvrToggleList(selectedCvr, listId)}
+          onCreateList={(name) => handleCvrCreateList(selectedCvr, name)}
+          onAnalyze={() => handleAnalyze(selectedCvr)}
         />
       ) : null}
     </section>

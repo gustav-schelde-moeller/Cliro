@@ -6,6 +6,7 @@ import { Avatar } from "@/components/shared/Avatar";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
 import { statusLabel } from "@/lib/status";
 import { inviteEmailAction, removeMemberAction, setRoleAction, type ActionResult } from "@/lib/actions/team-actions";
+import { toggleCompanyInListAction, toggleCvrCompanyInListAction } from "@/lib/actions/list-actions";
 import type { Company } from "@/lib/companies";
 import type { LeadState } from "@/components/leads/LeadCard";
 import { LeadDrawer } from "@/components/leads/LeadDrawer";
@@ -183,6 +184,30 @@ export function TeamView({
     });
   }
 
+  const [removingCompany, removingStartTransition] = useTransition();
+
+  function handleRemoveCompany(listId: string, companyId: number) {
+    removingStartTransition(async () => {
+      try {
+        await toggleCompanyInListAction(teamId, listId, companyId);
+        router.refresh();
+      } catch (err) {
+        showToast(errorMessage(err, "Kunne ikke fjerne virksomheden."));
+      }
+    });
+  }
+
+  function handleRemoveCvrCompany(listId: string, cvrNummer: string) {
+    removingStartTransition(async () => {
+      try {
+        await toggleCvrCompanyInListAction(teamId, listId, cvrNummer);
+        router.refresh();
+      } catch (err) {
+        showToast(errorMessage(err, "Kunne ikke fjerne virksomheden."));
+      }
+    });
+  }
+
   return (
     <section>
       <div className="panel-card" style={{ marginBottom: 16 }}>
@@ -326,8 +351,13 @@ export function TeamView({
           publicLists.map((l, i) => {
             const itemCount = l.companies.length + l.cvrCompanies.length;
             return (
-              <div className="panel-card list-card-anim" style={{ marginTop: i === 0 ? 0 : 10, animationDelay: `${Math.min(i, 8) * 40}ms` }} key={l.id}>
-                <div className="list-header-row" onClick={() => setSelectedListId(l.id)}>
+              <div
+                className="panel-card list-card-anim"
+                style={{ marginTop: i === 0 ? 0 : 10, animationDelay: `${Math.min(i, 8) * 40}ms`, cursor: "pointer" }}
+                onClick={() => setSelectedListId(l.id)}
+                key={l.id}
+              >
+                <div className="list-header-row">
                   <div className="list-header-title">
                     <h3 className="list-name-link">{l.name}</h3>
                     <span className="tag">
@@ -354,9 +384,12 @@ export function TeamView({
         <TeamListDrawer
           list={selectedList}
           openableCvrNummers={openableCvrNummers}
+          removing={removingCompany}
           onClose={() => setSelectedListId(null)}
           onOpenCompany={(id) => setSelectedId(id)}
           onOpenCvrCompany={openCvrByNummer}
+          onRemoveCompany={(id) => handleRemoveCompany(selectedList.id, id)}
+          onRemoveCvrCompany={(cvrNummer) => handleRemoveCvrCompany(selectedList.id, cvrNummer)}
         />
       ) : null}
 

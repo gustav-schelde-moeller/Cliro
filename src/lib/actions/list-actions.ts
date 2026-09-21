@@ -25,9 +25,13 @@ async function requireListInTeam(teamId: string, listId: string) {
 
 // Private lists are only visible/actionable by their creator — enforced
 // here so a guessed/leaked listId can't be used to read or mutate a list
-// the UI never shows to anyone else.
-function requireListAccess(list: { isPrivate: boolean; createdBy: string }, userId: string) {
-  if (list.isPrivate && list.createdBy !== userId) throw new Error("Du har ikke adgang til den liste.");
+// the UI never shows to anyone else. A visible (public) list is normally
+// editable by any team member too, unless its owner has turned that off
+// via teamCanEdit, in which case only the owner can still change it.
+function requireListAccess(list: { isPrivate: boolean; createdBy: string; teamCanEdit: boolean }, userId: string) {
+  if (list.createdBy === userId) return;
+  if (list.isPrivate) throw new Error("Du har ikke adgang til den liste.");
+  if (!list.teamCanEdit) throw new Error("Kun listens ejer kan redigere den.");
 }
 
 function revalidateListPages() {
@@ -136,6 +140,30 @@ export async function toggleListVisibilityAction(teamId: string, listId: string)
   });
   revalidateListPages();
   return { isPrivate: updated.isPrivate };
+}
+
+export async function toggleListTeamEditAction(teamId: string, listId: string) {
+  const user = await requireUser();
+  await requireMembership(teamId, user.id);
+  const list = await requireListInTeam(teamId, listId);
+  if (list.createdBy !== user.id) throw new Error("Kun listens ejer kan ændre redigeringsadgangen.");
+
+  const updated = await prisma.companyList.update({
+    where: { id: listId },
+    data: { teamCanEdit: !list.teamCanEdit },
+  });
+  await prisma.activityLog.create({
+    data: {
+      teamId,
+      userId: user.id,
+      who: user.name ?? "Ukendt",
+      action: updated.teamCanEdit
+        ? `lod teamet redigere listen "${list.name}"`
+        : `gjorde listen "${list.name}" kun redigerbar af ejeren`,
+    },
+  });
+  revalidateListPages();
+  return { teamCanEdit: updated.teamCanEdit };
 }
 
 export async function toggleCvrCompanyInListAction(teamId: string, listId: string, cvrNummer: string) {

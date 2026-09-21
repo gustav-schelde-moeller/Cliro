@@ -32,12 +32,18 @@ export default async function TeamPage() {
       getTeamLeadsMap(teamId),
       getTeamCvrLeadsMap(teamId),
       getActivityLog(teamId, 60),
-      getPublicTeamListsWithCompanies(teamId),
+      getPublicTeamListsWithCompanies(teamId, session.user.id),
       getUserStars(session.user.id),
       getTeamLists(teamId, session.user.id),
       getCompanyListMemberships(teamId, session.user.id),
     ]);
-  const cvrCompanies = await getCvrCompanyRows(teamId, session.user.id, [...cvrLeadsMap.keys()]);
+  // Union of every CVR company someone's actually touched (has a
+  // status/assignee) and every CVR company sitting in a public list, so
+  // "Overblik pr. teammedlem" and the list preview modal can both open a
+  // full drawer for any row they show, not just the ones with a lead.
+  const listCvrNummers = publicLists.flatMap((l) => l.cvrCompanies.map((c) => c.cvrNummer));
+  const wantedCvrNummers = [...new Set([...cvrLeadsMap.keys(), ...listCvrNummers])];
+  const cvrCompanies = await getCvrCompanyRows(teamId, session.user.id, wantedCvrNummers);
   const cvrCompanyByNummer = new Map(cvrCompanies.map((c) => [c.cvrNummer, c]));
   const listMembershipsPlain = Object.fromEntries(
     Array.from(listMembershipsMap.entries()).map(([companyId, listIds]) => [companyId, Array.from(listIds)]),

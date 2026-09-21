@@ -12,7 +12,7 @@ const STATUS_CLOSE_DELAY_MS = 350;
 
 // Columns whose first-click direction is ascending (A–Å / lowest-first) —
 // everything else defaults to descending (highest-first) on first click.
-const ASC_DEFAULT_SORT_KEYS = new Set(["navn", "brancheTekst", "region"]);
+const ASC_DEFAULT_SORT_KEYS = new Set(["navn", "brancheTekst", "region", "status"]);
 
 function SortArrow({ pointingDown }: { pointingDown: boolean }) {
   return (
@@ -511,7 +511,9 @@ export function CvrBrowser({
                 Købekraft{sortIndicator("koebekraftScore")}
               </th>
               {myLocation ? <th>Afstand</th> : null}
-              <th>Status</th>
+              <th onClick={() => toggleSort("status")} style={{ cursor: "pointer" }}>
+                Status{sortIndicator("status")}
+              </th>
               <th />
             </tr>
           </thead>
@@ -530,7 +532,7 @@ export function CvrBrowser({
                       {c.starred ? "★" : "☆"}
                     </button>
                   </td>
-                  <td>{c.navn || "Ukendt navn"}</td>
+                  <td className="cell-primary">{c.navn || "Ukendt navn"}</td>
                   <td>{c.brancheLabel ?? "—"}</td>
                   <td>{c.region ?? "—"}</td>
                   <td>{c.employees ?? "—"}</td>

@@ -180,6 +180,7 @@ export type CompanyListInfo = {
   createdAt: Date;
   createdByName: string | null;
   isPrivate: boolean;
+  teamCanEdit: boolean;
   isMine: boolean;
   itemCount: number;
 };
@@ -205,6 +206,7 @@ export async function getTeamLists(teamId: string, userId: string): Promise<Comp
     createdAt: l.createdAt,
     createdByName: creatorNames.get(l.createdBy) ?? null,
     isPrivate: l.isPrivate,
+    teamCanEdit: l.teamCanEdit,
     isMine: l.createdBy === userId,
     itemCount: l.items.length + l.cvrItems.length,
   }));
@@ -227,6 +229,7 @@ export async function getPublicTeamLists(teamId: string): Promise<CompanyListInf
     createdAt: l.createdAt,
     createdByName: creatorNames.get(l.createdBy) ?? null,
     isPrivate: l.isPrivate,
+    teamCanEdit: l.teamCanEdit,
     isMine: false,
     itemCount: l.items.length + l.cvrItems.length,
   }));
@@ -271,6 +274,7 @@ export type CompanyListWithCompanies = {
   createdAt: Date;
   createdByName: string | null;
   isPrivate: boolean;
+  teamCanEdit: boolean;
   isMine: boolean;
   companies: Company[];
   cvrCompanies: {
@@ -304,6 +308,7 @@ export async function getListsWithCompanies(teamId: string, userId: string): Pro
     createdAt: l.createdAt,
     createdByName: creatorNames.get(l.createdBy) ?? null,
     isPrivate: l.isPrivate,
+    teamCanEdit: l.teamCanEdit,
     isMine: l.createdBy === userId,
     companies: l.items.map((i) => companyById.get(i.companyId)).filter((c): c is Company => Boolean(c)),
     cvrCompanies: l.cvrItems.map((i) => ({
@@ -322,7 +327,7 @@ export async function getListsWithCompanies(teamId: string, userId: string): Pro
 // mirrors getPublicTeamLists's public-only visibility, but with the
 // per-company data getListsWithCompanies has, so a list can be previewed
 // (and its AI leads opened) without navigating to the Lister page.
-export async function getPublicTeamListsWithCompanies(teamId: string): Promise<CompanyListWithCompanies[]> {
+export async function getPublicTeamListsWithCompanies(teamId: string, userId: string): Promise<CompanyListWithCompanies[]> {
   const [lists, allCompanies] = await Promise.all([
     prisma.companyList.findMany({
       where: { teamId, isPrivate: false },
@@ -342,7 +347,8 @@ export async function getPublicTeamListsWithCompanies(teamId: string): Promise<C
     createdAt: l.createdAt,
     createdByName: creatorNames.get(l.createdBy) ?? null,
     isPrivate: l.isPrivate,
-    isMine: false,
+    teamCanEdit: l.teamCanEdit,
+    isMine: l.createdBy === userId,
     companies: l.items.map((i) => companyById.get(i.companyId)).filter((c): c is Company => Boolean(c)),
     cvrCompanies: l.cvrItems.map((i) => ({
       cvrNummer: i.company.cvrNummer,

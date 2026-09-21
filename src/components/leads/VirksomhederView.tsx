@@ -366,9 +366,6 @@ export function VirksomhederView({
       {hasMore ? (
         <div className="load-more-row">
           <div ref={loadMoreRef} className="load-more-sentinel" />
-          <button type="button" className="btn" onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}>
-            Indlæs flere
-          </button>
         </div>
       ) : null}
       <div className="footer-note">Cliro · mails er udkast — læs dem igennem før afsendelse · stjerner er personlige og deles ikke med teamet</div>
