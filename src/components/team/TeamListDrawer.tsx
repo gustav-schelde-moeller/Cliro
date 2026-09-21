@@ -39,6 +39,7 @@ export function TeamListDrawer({
   list,
   openableCvrNummers,
   removing,
+  nestedDrawerOpen,
   onClose,
   onOpenCompany,
   onOpenCvrCompany,
@@ -48,6 +49,14 @@ export function TeamListDrawer({
   list: TeamListPreview;
   openableCvrNummers: Set<string>;
   removing: boolean;
+  // True while a company's own drawer (opened from a row below) is showing
+  // on top of this one. AI leads and CVR companies open into two
+  // independent drawers (LeadDrawer / CvrDrawer), so without this a second
+  // row click while the first drawer is still open would open both at
+  // once — two independent scrims stacking, doubling the dimming and
+  // stacking one drawer visually on top of the other. Rows are inert
+  // until the open one is closed.
+  nestedDrawerOpen: boolean;
   onClose: () => void;
   onOpenCompany: (companyId: number) => void;
   onOpenCvrCompany: (cvrNummer: string) => void;
@@ -70,6 +79,7 @@ export function TeamListDrawer({
       }
       onClose={onClose}
       maxWidth={920}
+      dimmed={nestedDrawerOpen}
     >
       {total === 0 ? (
         <div className="dash-empty">Ingen virksomheder i denne liste endnu.</div>
@@ -91,7 +101,11 @@ export function TeamListDrawer({
             </thead>
             <tbody>
               {list.companies.map((c) => (
-                <tr key={`lead-${c.id}`} className="list-table-row" onClick={() => onOpenCompany(c.id)}>
+                <tr
+                  key={`lead-${c.id}`}
+                  className={`list-table-row${nestedDrawerOpen ? " list-table-row-disabled" : ""}`}
+                  onClick={nestedDrawerOpen ? undefined : () => onOpenCompany(c.id)}
+                >
                   <td className="cell-primary">{c.name}</td>
                   <td>{c.industry}</td>
                   <td>{c.city}</td>
@@ -105,7 +119,7 @@ export function TeamListDrawer({
                       <button
                         type="button"
                         className="btn"
-                        disabled={removing}
+                        disabled={removing || nestedDrawerOpen}
                         onClick={(e) => {
                           e.stopPropagation();
                           onRemoveCompany(c.id);
@@ -118,7 +132,7 @@ export function TeamListDrawer({
                 </tr>
               ))}
               {list.cvrCompanies.map((c) => {
-                const openable = openableCvrNummers.has(c.cvrNummer);
+                const openable = openableCvrNummers.has(c.cvrNummer) && !nestedDrawerOpen;
                 return (
                   <tr
                     key={`cvr-${c.cvrNummer}`}
@@ -138,7 +152,7 @@ export function TeamListDrawer({
                         <button
                           type="button"
                           className="btn"
-                          disabled={removing}
+                          disabled={removing || nestedDrawerOpen}
                           onClick={(e) => {
                             e.stopPropagation();
                             onRemoveCvrCompany(c.cvrNummer);

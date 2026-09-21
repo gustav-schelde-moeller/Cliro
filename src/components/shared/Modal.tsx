@@ -6,6 +6,7 @@ export function Modal({
   onClose,
   children,
   maxWidth,
+  dimmed,
 }: {
   title: string;
   subtitle?: React.ReactNode;
@@ -14,11 +15,21 @@ export function Modal({
   // Widens the panel past its 360px default (e.g. for a modal that holds a
   // wide table) while keeping the same centered scrim/panel scaffolding.
   maxWidth?: number;
+  // Fades the panel back when something else (another drawer) has opened
+  // on top of it, so it reads as "in the background" rather than looking
+  // like a second, independently-lit layer stacked underneath.
+  dimmed?: boolean;
 }) {
   return (
     <>
       <div className="scrim open" onClick={onClose} />
-      <div className="modal-panel" style={maxWidth ? { width: `min(${maxWidth}px, calc(100vw - 32px))` } : undefined}>
+      <div
+        className="modal-panel"
+        style={{
+          ...(maxWidth ? { width: `min(${maxWidth}px, calc(100vw - 32px))` } : undefined),
+          ...(dimmed ? { opacity: 0.4, transition: "opacity 0.15s ease" } : undefined),
+        }}
+      >
         <div className="modal-head">
           <div>
             <h3>{title}</h3>

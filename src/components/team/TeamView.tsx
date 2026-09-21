@@ -385,6 +385,7 @@ export function TeamView({
           list={selectedList}
           openableCvrNummers={openableCvrNummers}
           removing={removingCompany}
+          nestedDrawerOpen={selectedCompany != null || selectedCvr != null}
           onClose={() => setSelectedListId(null)}
           onOpenCompany={(id) => setSelectedId(id)}
           onOpenCvrCompany={openCvrByNummer}

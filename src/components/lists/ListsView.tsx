@@ -104,6 +104,11 @@ export function ListsView({
     return map;
   }, [lists]);
   const selectedCompany = selectedId != null ? companyById.get(selectedId) ?? null : null;
+  // AI leads and CVR companies open into two independent drawers
+  // (LeadDrawer / CvrDrawer), so without this a row click while the other
+  // kind's drawer is already open would open both at once — two
+  // independent scrims stacking. Rows are inert until the open one closes.
+  const companyDrawerOpen = selectedCompany != null || selectedCvr != null;
 
   function openCvrByNummer(cvrNummer: string) {
     const match = cvrRows.find((r) => r.cvrNummer === cvrNummer);
@@ -305,7 +310,11 @@ export function ListsView({
                         </thead>
                         <tbody>
                           {list.companies.map((c) => (
-                            <tr key={`lead-${c.id}`} className="list-table-row" onClick={() => setSelectedId(c.id)}>
+                            <tr
+                              key={`lead-${c.id}`}
+                              className={`list-table-row${companyDrawerOpen ? " list-table-row-disabled" : ""}`}
+                              onClick={companyDrawerOpen ? undefined : () => setSelectedId(c.id)}
+                            >
                               <td className="cell-primary">{c.name}</td>
                               <td>{c.industry}</td>
                               <td>{c.city}</td>
@@ -319,7 +328,7 @@ export function ListsView({
                                   <button
                                     type="button"
                                     className="btn"
-                                    disabled={isPending}
+                                    disabled={isPending || companyDrawerOpen}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleRemoveCompany(list.id, c.id);
@@ -332,7 +341,7 @@ export function ListsView({
                             </tr>
                           ))}
                           {list.cvrCompanies.map((c) => {
-                            const openable = cvrRows.some((r) => r.cvrNummer === c.cvrNummer);
+                            const openable = cvrRows.some((r) => r.cvrNummer === c.cvrNummer) && !companyDrawerOpen;
                             return (
                               <tr
                                 key={`cvr-${c.cvrNummer}`}
@@ -352,7 +361,7 @@ export function ListsView({
                                     <button
                                       type="button"
                                       className="btn"
-                                      disabled={isPending}
+                                      disabled={isPending || companyDrawerOpen}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleRemoveCvrCompany(list.id, c.cvrNummer);
