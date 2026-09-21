@@ -17,7 +17,15 @@ import {
 } from "@/lib/actions/list-actions";
 import { ListActionsMenu } from "./ListActionsMenu";
 
-type CvrListCompany = { cvrNummer: string; navn: string | null; brancheTekst: string | null; kommunenavn: string | null; email: string | null };
+type CvrListCompany = {
+  cvrNummer: string;
+  navn: string | null;
+  brancheTekst: string | null;
+  kommunenavn: string | null;
+  email: string | null;
+  telefon: string | null;
+  koebekraftScore: number | null;
+};
 
 type ListItem = {
   id: string;
@@ -239,7 +247,7 @@ export function ListsView({
                       Ingen virksomheder i denne liste endnu.
                     </div>
                   ) : null}
-                  {list.companies.length > 0 ? (
+                  {list.companies.length > 0 || list.cvrCompanies.length > 0 ? (
                     <div className="list-table-wrap" style={{ marginTop: 12 }}>
                       <table className="list-table">
                         <thead>
@@ -255,7 +263,7 @@ export function ListsView({
                         </thead>
                         <tbody>
                           {list.companies.map((c) => (
-                            <tr key={c.id} className="list-table-row" onClick={() => setSelectedId(c.id)}>
+                            <tr key={`lead-${c.id}`} className="list-table-row" onClick={() => setSelectedId(c.id)}>
                               <td>{c.name}</td>
                               <td>{c.industry}</td>
                               <td>{c.city}</td>
@@ -277,28 +285,13 @@ export function ListsView({
                               </td>
                             </tr>
                           ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : null}
-                  {list.cvrCompanies.length > 0 ? (
-                    <div className="list-table-wrap" style={{ marginTop: 12 }}>
-                      <table className="list-table">
-                        <thead>
-                          <tr>
-                            <th>Navn</th>
-                            <th>Branche</th>
-                            <th>By</th>
-                            <th>Email</th>
-                            <th />
-                          </tr>
-                        </thead>
-                        <tbody>
                           {list.cvrCompanies.map((c) => (
-                            <tr key={c.cvrNummer} className="list-table-row">
+                            <tr key={`cvr-${c.cvrNummer}`} className="list-table-row">
                               <td>{c.navn || "Ukendt navn"}</td>
                               <td>{c.brancheTekst ?? "—"}</td>
                               <td>{c.kommunenavn ?? "—"}</td>
+                              <td>{c.koebekraftScore ?? "—"}</td>
+                              <td>{c.telefon ?? "—"}</td>
                               <td>{c.email ?? "—"}</td>
                               <td>
                                 <button

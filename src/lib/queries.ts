@@ -250,7 +250,15 @@ export type CompanyListWithCompanies = {
   isPrivate: boolean;
   isMine: boolean;
   companies: Company[];
-  cvrCompanies: { cvrNummer: string; navn: string | null; brancheTekst: string | null; kommunenavn: string | null; email: string | null }[];
+  cvrCompanies: {
+    cvrNummer: string;
+    navn: string | null;
+    brancheTekst: string | null;
+    kommunenavn: string | null;
+    email: string | null;
+    telefon: string | null;
+    koebekraftScore: number | null;
+  }[];
 };
 
 export async function getListsWithCompanies(teamId: string, userId: string): Promise<CompanyListWithCompanies[]> {
@@ -281,6 +289,8 @@ export async function getListsWithCompanies(teamId: string, userId: string): Pro
       brancheTekst: i.company.brancheTekst,
       kommunenavn: i.company.kommunenavn,
       email: i.company.email,
+      telefon: i.company.telefon,
+      koebekraftScore: i.company.koebekraftScore,
     })),
   }));
 }
