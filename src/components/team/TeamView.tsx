@@ -1,11 +1,20 @@
 "use client";
 
-import { useActionState, useRef, useState, useTransition } from "react";
+import { useActionState, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/shared/Avatar";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
 import { statusLabel } from "@/lib/status";
 import { inviteEmailAction, removeMemberAction, setRoleAction, type ActionResult } from "@/lib/actions/team-actions";
+import type { Company } from "@/lib/companies";
+import type { LeadState } from "@/components/leads/LeadCard";
+import { LeadDrawer } from "@/components/leads/LeadDrawer";
+import { useLeadMutations } from "@/components/leads/useLeadMutations";
+import { CvrDrawer } from "@/components/leads/CvrDrawer";
+import { useCvrRowMutations } from "@/components/leads/useCvrRowMutations";
+import type { CvrCompanyRow } from "@/components/leads/CvrBrowser";
+import type { TeamListOption } from "@/components/leads/ListMenu";
+import { TeamListDrawer, type TeamListPreview } from "./TeamListDrawer";
 
 type MemberLead = { id: number; name: string; industry: string; status: string };
 type MemberCvrLead = { cvrNummer: string; name: string; industry: string; status: string };
@@ -21,7 +30,6 @@ type Member = {
   cvrLeads: MemberCvrLead[];
 };
 type ActivityItem = { id: string; ts: string; who: string; action: string; company: string | null };
-type PublicListItem = { id: string; name: string; createdAt: string; createdByName: string | null; itemCount: number };
 
 function formatDate(iso: string): string {
   return new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
@@ -46,9 +54,16 @@ export function TeamView({
   isAdmin,
   isOwner,
   myUserId,
+  myName,
   members,
   activity,
   publicLists,
+  allCompanies,
+  allCvrCompanies,
+  initialLeads,
+  initialStars,
+  initialTeamListOptions,
+  initialListMemberships,
 }: {
   teamId: string;
   teamName: string;
@@ -59,12 +74,57 @@ export function TeamView({
   myName: string;
   members: Member[];
   activity: ActivityItem[];
-  publicLists: PublicListItem[];
+  publicLists: TeamListPreview[];
+  allCompanies: Company[];
+  allCvrCompanies: CvrCompanyRow[];
+  initialLeads: Record<number, LeadState>;
+  initialStars: number[];
+  initialTeamListOptions: TeamListOption[];
+  initialListMemberships: Record<number, string[]>;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const inviteFormRef = useRef<HTMLFormElement>(null);
+
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [cvrRows, setCvrRows] = useState<CvrCompanyRow[]>(allCvrCompanies);
+  const [selectedCvr, setSelectedCvr] = useState<CvrCompanyRow | null>(null);
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+
+  const {
+    starred,
+    teamLists,
+    listMemberships,
+    leadOf,
+    handleToggleStar,
+    handleSetStatus,
+    handleAssign,
+    handleRelease,
+    handleToggleList,
+    handleCreateList,
+  } = useLeadMutations({ teamId, myName, initialLeads, initialStars, initialTeamLists: initialTeamListOptions, initialListMemberships });
+
+  const {
+    teamLists: cvrTeamLists,
+    analyzingFor,
+    handleSetStatus: handleCvrSetStatus,
+    handleAssign: handleCvrAssign,
+    handleRelease: handleCvrRelease,
+    handleToggleStar: handleCvrToggleStar,
+    handleToggleList: handleCvrToggleList,
+    handleCreateList: handleCvrCreateList,
+    handleAnalyze,
+  } = useCvrRowMutations({ teamId, myName, initialTeamLists: initialTeamListOptions, setRows: setCvrRows, setSelected: setSelectedCvr });
+
+  const selectedCompany = selectedId != null ? allCompanies.find((c) => c.id === selectedId) ?? null : null;
+  const selectedList = selectedListId != null ? publicLists.find((l) => l.id === selectedListId) ?? null : null;
+  const openableCvrNummers = useMemo(() => new Set(cvrRows.map((r) => r.cvrNummer)), [cvrRows]);
+
+  function openCvrByNummer(cvrNummer: string) {
+    const match = cvrRows.find((r) => r.cvrNummer === cvrNummer);
+    if (match) setSelectedCvr(match);
+  }
 
   const [inviteState, inviteFormAction, invitePending] = useActionState(
     async (_prev: ActionResult, formData: FormData) => {
@@ -233,7 +293,7 @@ export function TeamView({
               {m.leads.length > 0 || m.cvrLeads.length > 0 ? (
                 <div className="member-leads">
                   {m.leads.map((l) => (
-                    <div className="member-lead-row" key={l.id} onClick={() => router.push(`/virksomheder?open=${l.id}`)}>
+                    <div className="member-lead-row" key={l.id} onClick={() => setSelectedId(l.id)}>
                       <span className="status-pill" data-status={l.status}>
                         {statusLabel(l.status)}
                       </span>
@@ -242,7 +302,7 @@ export function TeamView({
                     </div>
                   ))}
                   {m.cvrLeads.map((l) => (
-                    <div className="member-lead-row" key={l.cvrNummer} onClick={() => router.push(`/virksomheder?cvr=${l.cvrNummer}`)}>
+                    <div className="member-lead-row" key={l.cvrNummer} onClick={() => openCvrByNummer(l.cvrNummer)}>
                       <span className="status-pill" data-status={l.status}>
                         {statusLabel(l.status)}
                       </span>
@@ -263,26 +323,77 @@ export function TeamView({
         {publicLists.length === 0 ? (
           <div className="dash-empty">Ingen synlige lister endnu. Opret en på Lister-siden og gør den synlig for teamet.</div>
         ) : (
-          publicLists.map((l, i) => (
-            <div className="panel-card list-card-anim" style={{ marginTop: i === 0 ? 0 : 10, animationDelay: `${Math.min(i, 8) * 40}ms` }} key={l.id}>
-              <div className="list-header-row" onClick={() => router.push(`/lister?list=${l.id}`)}>
-                <div className="list-header-title">
-                  <h3 className="list-name-link">{l.name}</h3>
-                  <span className="tag">
-                    {l.itemCount} {l.itemCount === 1 ? "virksomhed" : "virksomheder"}
-                  </span>
+          publicLists.map((l, i) => {
+            const itemCount = l.companies.length + l.cvrCompanies.length;
+            return (
+              <div className="panel-card list-card-anim" style={{ marginTop: i === 0 ? 0 : 10, animationDelay: `${Math.min(i, 8) * 40}ms` }} key={l.id}>
+                <div className="list-header-row" onClick={() => setSelectedListId(l.id)}>
+                  <div className="list-header-title">
+                    <h3 className="list-name-link">{l.name}</h3>
+                    <span className="tag">
+                      {itemCount} {itemCount === 1 ? "virksomhed" : "virksomheder"}
+                    </span>
+                  </div>
+                </div>
+                <div className="distance-note list-created-note">
+                  {l.createdByName ? `Oprettet af ${l.createdByName} · ` : ""}
+                  {formatDate(l.createdAt)}
                 </div>
               </div>
-              <div className="distance-note list-created-note">
-                {l.createdByName ? `Oprettet af ${l.createdByName} · ` : ""}
-                {formatDate(l.createdAt)}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
       <div className="footer-note">Den første person i et team er automatisk ejer og kan gøre andre til admin herfra.</div>
+
+      {/* Rendered before LeadDrawer/CvrDrawer so that opening a company from
+          inside this list preview stacks visually on top of it — all three
+          drawers share the same z-index, so later-in-DOM wins the tie. */}
+      {selectedList ? (
+        <TeamListDrawer
+          list={selectedList}
+          openableCvrNummers={openableCvrNummers}
+          onClose={() => setSelectedListId(null)}
+          onOpenCompany={(id) => setSelectedId(id)}
+          onOpenCvrCompany={openCvrByNummer}
+        />
+      ) : null}
+
+      {selectedCompany ? (
+        <LeadDrawer
+          company={selectedCompany}
+          lead={leadOf(selectedCompany.id)}
+          starred={starred.has(selectedCompany.id)}
+          teamLists={teamLists}
+          listIds={new Set(listMemberships[selectedCompany.id] ?? [])}
+          myName={myName}
+          onClose={() => setSelectedId(null)}
+          onToggleStar={() => handleToggleStar(selectedCompany.id)}
+          onSetStatus={(status) => handleSetStatus(selectedCompany.id, status)}
+          onAssign={() => handleAssign(selectedCompany.id)}
+          onRelease={() => handleRelease(selectedCompany.id)}
+          onToggleList={(listId) => handleToggleList(selectedCompany.id, listId)}
+          onCreateList={(name) => handleCreateList(selectedCompany.id, name)}
+        />
+      ) : null}
+
+      {selectedCvr ? (
+        <CvrDrawer
+          company={selectedCvr}
+          myName={myName}
+          teamLists={cvrTeamLists}
+          analyzing={analyzingFor === selectedCvr.cvrNummer}
+          onClose={() => setSelectedCvr(null)}
+          onToggleStar={() => handleCvrToggleStar(selectedCvr)}
+          onSetStatus={(status) => handleCvrSetStatus(selectedCvr, status)}
+          onAssign={() => handleCvrAssign(selectedCvr)}
+          onRelease={() => handleCvrRelease(selectedCvr)}
+          onToggleList={(listId) => handleCvrToggleList(selectedCvr, listId)}
+          onCreateList={(name) => handleCvrCreateList(selectedCvr, name)}
+          onAnalyze={() => handleAnalyze(selectedCvr)}
+        />
+      ) : null}
     </section>
   );
 }

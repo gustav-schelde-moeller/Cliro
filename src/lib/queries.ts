@@ -318,6 +318,44 @@ export async function getListsWithCompanies(teamId: string, userId: string): Pro
   }));
 }
 
+// Team page's "all team lists" section, with each list's companies —
+// mirrors getPublicTeamLists's public-only visibility, but with the
+// per-company data getListsWithCompanies has, so a list can be previewed
+// (and its AI leads opened) without navigating to the Lister page.
+export async function getPublicTeamListsWithCompanies(teamId: string): Promise<CompanyListWithCompanies[]> {
+  const [lists, allCompanies] = await Promise.all([
+    prisma.companyList.findMany({
+      where: { teamId, isPrivate: false },
+      include: { items: true, cvrItems: { include: { company: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+    getCompanies(),
+  ]);
+  const companyById = new Map(allCompanies.map((c) => [c.id, c]));
+  const creatorIds = Array.from(new Set(lists.map((l) => l.createdBy)));
+  const creators = await prisma.user.findMany({ where: { id: { in: creatorIds } }, select: { id: true, name: true } });
+  const creatorNames = new Map(creators.map((c) => [c.id, c.name]));
+
+  return lists.map((l) => ({
+    id: l.id,
+    name: l.name,
+    createdAt: l.createdAt,
+    createdByName: creatorNames.get(l.createdBy) ?? null,
+    isPrivate: l.isPrivate,
+    isMine: false,
+    companies: l.items.map((i) => companyById.get(i.companyId)).filter((c): c is Company => Boolean(c)),
+    cvrCompanies: l.cvrItems.map((i) => ({
+      cvrNummer: i.company.cvrNummer,
+      navn: i.company.navn,
+      brancheTekst: i.company.brancheTekst,
+      kommunenavn: i.company.kommunenavn,
+      email: i.company.email,
+      telefon: i.company.telefon,
+      koebekraftScore: i.company.koebekraftScore,
+    })),
+  }));
+}
+
 export async function getUserTeams(userId: string) {
   const memberships = await prisma.teamMember.findMany({
     where: { userId },

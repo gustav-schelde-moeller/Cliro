@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { displayScore, type Company } from "@/lib/companies";
 import type { LeadState } from "@/components/leads/LeadCard";
 import type { TeamListOption } from "@/components/leads/ListMenu";
@@ -57,24 +57,12 @@ export function ListsView({
 }) {
   const router = useRouter();
   const { showToast } = useToast();
-  // Team's "Alle team-lister" links here with ?list=<id> so the linked list
-  // opens already expanded instead of the user having to find and click it
-  // again.
-  const searchParams = useSearchParams();
-  const openListId = searchParams.get("list");
   const [isPending, startTransition] = useTransition();
   const [creatingOpen, setCreatingOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(openListId ? [openListId] : []));
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!openListId) return;
-    document.getElementById(`list-${openListId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    // Only ever needs to run once for the link that brought us here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const {
     starred,
@@ -219,7 +207,6 @@ export function ListsView({
           const isExpanded = expandedIds.has(list.id);
           return (
             <div
-              id={`list-${list.id}`}
               className="panel-card list-card-anim"
               style={{ marginBottom: 16, animationDelay: `${Math.min(i, 8) * 40}ms` }}
               key={list.id}

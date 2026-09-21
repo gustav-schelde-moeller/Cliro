@@ -113,22 +113,13 @@ export function CvrBrowser({
   teamId,
   myName,
   initialTeamLists,
-  initialOpenCvr,
 }: {
   teamId: string;
   myName: string;
   initialTeamLists: TeamListOption[];
-  initialOpenCvr?: string | null;
 }) {
   const { showToast } = useToast();
-  const [search, setSearch] = useState(initialOpenCvr ?? "");
-  // Set once from initialOpenCvr and cleared the moment it's matched — deep
-  // links in from Team's "Overblik pr. teammedlem" land here with the
-  // company's row not loaded yet (CvrBrowser paginates from the server), so
-  // seeding `search` with the CVR number above triggers the normal
-  // exact-cvrNummer-match fetch path, and this just opens the drawer once
-  // that row actually arrives.
-  const [pendingOpenCvr, setPendingOpenCvr] = useState(initialOpenCvr ?? null);
+  const [search, setSearch] = useState("");
   const [branche, setBranche] = useState("");
   const [region, setRegion] = useState("");
   const [size, setSize] = useState("");
@@ -252,20 +243,6 @@ export function CvrBrowser({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (!pendingOpenCvr) return;
-    const match = rows.find((r) => r.cvrNummer === pendingOpenCvr);
-    if (match) {
-      // Reacting to freshly arrived external data (the fetch in the effect
-      // above), same sanctioned pattern as that effect — not a value
-      // derivable during render, since it must fire exactly once per
-      // deep-link and then stop.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelected(match);
-      setPendingOpenCvr(null);
-    }
-  }, [rows, pendingOpenCvr]);
 
   useEffect(() => {
     const el = sentinelRef.current;

@@ -8,7 +8,10 @@ import {
   getTeamCvrLeadsMap,
   getCvrCompanyRows,
   getActivityLog,
-  getPublicTeamLists,
+  getPublicTeamListsWithCompanies,
+  getUserStars,
+  getTeamLists,
+  getCompanyListMemberships,
 } from "@/lib/queries";
 import { getCompanies } from "@/lib/companies";
 import { TeamView } from "@/components/team/TeamView";
@@ -22,16 +25,23 @@ export default async function TeamPage() {
   const ctx = await getTeamWithRole(teamId, session.user.id);
   if (!ctx) redirect("/team-gate");
 
-  const [COMPANIES, members, leadsMap, cvrLeadsMap, activity, publicLists] = await Promise.all([
-    getCompanies(),
-    getTeamMembers(teamId, ctx.team.ownerId),
-    getTeamLeadsMap(teamId),
-    getTeamCvrLeadsMap(teamId),
-    getActivityLog(teamId, 60),
-    getPublicTeamLists(teamId),
-  ]);
+  const [COMPANIES, members, leadsMap, cvrLeadsMap, activity, publicLists, userStars, teamListOptions, listMembershipsMap] =
+    await Promise.all([
+      getCompanies(),
+      getTeamMembers(teamId, ctx.team.ownerId),
+      getTeamLeadsMap(teamId),
+      getTeamCvrLeadsMap(teamId),
+      getActivityLog(teamId, 60),
+      getPublicTeamListsWithCompanies(teamId),
+      getUserStars(session.user.id),
+      getTeamLists(teamId, session.user.id),
+      getCompanyListMemberships(teamId, session.user.id),
+    ]);
   const cvrCompanies = await getCvrCompanyRows(teamId, session.user.id, [...cvrLeadsMap.keys()]);
   const cvrCompanyByNummer = new Map(cvrCompanies.map((c) => [c.cvrNummer, c]));
+  const listMembershipsPlain = Object.fromEntries(
+    Array.from(listMembershipsMap.entries()).map(([companyId, listIds]) => [companyId, Array.from(listIds)]),
+  );
 
   const byMemberName: Record<string, { total: number; won: number; meeting: number }> = {};
   for (const c of COMPANIES) {
@@ -83,6 +93,12 @@ export default async function TeamPage() {
       members={memberBreakdown}
       activity={activity.map((a) => ({ id: a.id, ts: a.createdAt.toISOString(), who: a.who, action: a.action, company: a.companyName }))}
       publicLists={publicLists.map((l) => ({ ...l, createdAt: l.createdAt.toISOString() }))}
+      allCompanies={COMPANIES}
+      allCvrCompanies={cvrCompanies}
+      initialLeads={Object.fromEntries(leadsMap)}
+      initialStars={[...userStars]}
+      initialTeamListOptions={teamListOptions.map((l) => ({ id: l.id, name: l.name }))}
+      initialListMemberships={listMembershipsPlain}
     />
   );
 }

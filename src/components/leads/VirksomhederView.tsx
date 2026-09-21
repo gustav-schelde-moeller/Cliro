@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { displayScore, haversineKm, type Company } from "@/lib/companies";
 import { LeadCard, type LeadState, type TeamListOption } from "./LeadCard";
 import { LeadDrawer } from "./LeadDrawer";
@@ -61,14 +60,6 @@ export function VirksomhederView({
     handleCreateList,
   } = useLeadMutations({ teamId, myName, initialLeads, initialStars, initialTeamLists, initialListMemberships });
 
-  // Deep-link support: Team's "Overblik pr. teammedlem" links here with
-  // ?open=<leadId> (AI lead) or ?cvr=<cvrNummer> (CVR search result) — read
-  // once on mount to seed the initial tab/selection, same as any other
-  // initial-state prop.
-  const searchParams = useSearchParams();
-  const openLeadId = searchParams.get("open");
-  const openCvrNummer = searchParams.get("cvr");
-
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState<Tier>("all");
   const [industries, setIndustries] = useState<Set<string>>(new Set());
@@ -82,9 +73,9 @@ export function VirksomhederView({
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(openLeadId ? Number(openLeadId) : null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [locating, setLocating] = useState(false);
-  const [mode, setMode] = useState<"leads" | "cvr">(openCvrNummer ? "cvr" : "leads");
+  const [mode, setMode] = useState<"leads" | "cvr">("leads");
 
   const todayDa = TODAY_FORMATTER.format(new Date());
 
@@ -202,9 +193,7 @@ export function VirksomhederView({
         </button>
       </div>
 
-      {mode === "cvr" ? (
-        <CvrBrowser teamId={teamId} myName={myName} initialTeamLists={teamLists} initialOpenCvr={openCvrNummer} />
-      ) : (
+      {mode === "cvr" ? <CvrBrowser teamId={teamId} myName={myName} initialTeamLists={teamLists} /> : (
       <>
       <div className="toolbar">
         <div className="search-wrap">
