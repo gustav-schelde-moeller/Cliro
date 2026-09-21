@@ -259,6 +259,7 @@ model CvrCompany {
   teamLeads CvrTeamLead[]
   stars     CvrStar[]
   listItems CvrListItem[]
+  analysis  CvrAnalysis?
 
   @@index([status])
   @@index([brancheKode])
@@ -316,6 +317,36 @@ model CvrListItem {
 
   @@unique([listId, cvrNummer])
   @@map("cvr_list_items")
+}
+
+// On-demand AI research result for a CVR company, triggered by a user
+// clicking "Analysér med AI" (src/app/api/cvr/analyze/[cvr]/route.ts) — the
+// CVR-registry equivalent of Company's own enrichment fields (hook,
+// breakdown, tier, existing, social, idea, contact, mail), kept as a
+// separate 1:1 table rather than columns on CvrCompany, matching the
+// CvrTeamLead/CvrStar/CvrListItem pattern already used for other per-company
+// enrichment. hook is nullable: unlike the daily-research cron (which only
+// ever confirms a pre-found same-day candidate), this route searches for
+// *any* genuine, sourced news with no recency requirement — if a real
+// search turns up nothing, hook stays null rather than being invented.
+model CvrAnalysis {
+  cvrNummer  String   @id
+  score      Int
+  breakdown  Json // {contact, news, industry, creative} — same 0-30/0-35/0-20/0-15 rubric as Company.breakdown
+  tier       Json // {key, label}
+  hook       Json? // {title, summary, date, url} | null
+  existing   String
+  social     String
+  idea       String
+  contact    Json // {found, name, title, email, note, sourceUrl, profileUrl}
+  mail       Json // {subject, body}
+  analyzedBy String
+  analyzedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company CvrCompany @relation(fields: [cvrNummer], references: [cvrNummer], onDelete: Cascade)
+
+  @@map("cvr_analyses")
 }
 
 // Financial dashboard data — replaces financial-dashboard's local JSON

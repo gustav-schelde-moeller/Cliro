@@ -30,6 +30,7 @@ export function useCvrRowMutations({
 }) {
   const { showToast } = useToast();
   const [teamLists, setTeamLists] = useState<TeamListOption[]>(initialTeamLists);
+  const [analyzingFor, setAnalyzingFor] = useState<string | null>(null);
 
   function patch(cvrNummer: string, next: Partial<CvrCompanyRow>) {
     setRows((prev) => prev.map((r) => (r.cvrNummer === cvrNummer ? { ...r, ...next } : r)));
@@ -104,5 +105,32 @@ export function useCvrRowMutations({
     }
   }
 
-  return { teamLists, handleSetStatus, handleAssign, handleRelease, handleToggleStar, handleToggleList, handleCreateList };
+  // No optimistic update here — there's nothing sensible to show before the
+  // real research result arrives, just a loading state (analyzingFor) the
+  // drawer reads to disable its button and show progress copy.
+  async function handleAnalyze(row: CvrCompanyRow) {
+    setAnalyzingFor(row.cvrNummer);
+    try {
+      const res = await fetch(`/api/cvr/analyze/${row.cvrNummer}`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Kunne ikke analysere virksomheden.");
+      patch(row.cvrNummer, { analysis: data });
+    } catch (err) {
+      showToast(errorMessage(err, "Kunne ikke analysere virksomheden."));
+    } finally {
+      setAnalyzingFor(null);
+    }
+  }
+
+  return {
+    teamLists,
+    analyzingFor,
+    handleSetStatus,
+    handleAssign,
+    handleRelease,
+    handleToggleStar,
+    handleToggleList,
+    handleCreateList,
+    handleAnalyze,
+  };
 }

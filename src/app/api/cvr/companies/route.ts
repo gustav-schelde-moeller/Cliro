@@ -4,6 +4,7 @@ import { getActiveTeamId } from "@/lib/session-team";
 import { buildWhere, SORT_WHITELIST } from "@/lib/cvr/filters";
 import { brancheDisplayGroup } from "@/lib/cvr/branche";
 import { haversineKm } from "@/lib/companies";
+import { mapCvrAnalysis } from "@/lib/queries";
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
           where: { list: { teamId, OR: [{ isPrivate: false }, { createdBy: session.user.id }] } },
           select: { listId: true },
         },
+        analysis: true,
       },
       // cvrNummer as a secondary sort key guarantees a stable, deterministic
       // order across paginated requests — without it, ties on the primary
@@ -83,6 +85,7 @@ export async function GET(request: Request) {
       starred: row.stars.length > 0,
       listIds: row.listItems.map((i) => i.listId),
       distanceKm: lat != null && lng != null && row.lat != null && row.lng != null ? haversineKm(lat, lng, row.lat, row.lng) : null,
+      analysis: row.analysis ? mapCvrAnalysis(row.analysis) : null,
     };
   });
 

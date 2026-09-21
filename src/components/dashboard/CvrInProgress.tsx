@@ -21,8 +21,17 @@ export function CvrInProgress({
   const [rows, setRows] = useState(companies);
   const [selected, setSelected] = useState<CvrCompanyRow | null>(null);
 
-  const { teamLists, handleSetStatus, handleAssign, handleRelease, handleToggleStar, handleToggleList, handleCreateList } =
-    useCvrRowMutations({ teamId, myName, initialTeamLists, setRows, setSelected });
+  const {
+    teamLists,
+    analyzingFor,
+    handleSetStatus,
+    handleAssign,
+    handleRelease,
+    handleToggleStar,
+    handleToggleList,
+    handleCreateList,
+    handleAnalyze,
+  } = useCvrRowMutations({ teamId, myName, initialTeamLists, setRows, setSelected });
 
   if (rows.length === 0) {
     return <div className="dash-empty">Ingen CVR-virksomheder i gang endnu. Sæt en status eller tildel dig selv en fra CVR-søgning.</div>;
@@ -46,6 +55,7 @@ export function CvrInProgress({
           company={selected}
           myName={myName}
           teamLists={teamLists}
+          analyzing={analyzingFor === selected.cvrNummer}
           onClose={() => setSelected(null)}
           onToggleStar={() => handleToggleStar(selected)}
           onSetStatus={(status) => handleSetStatus(selected, status)}
@@ -53,6 +63,7 @@ export function CvrInProgress({
           onRelease={() => handleRelease(selected)}
           onToggleList={(listId) => handleToggleList(selected, listId)}
           onCreateList={(name) => handleCreateList(selected, name)}
+          onAnalyze={() => handleAnalyze(selected)}
         />
       ) : null}
     </>

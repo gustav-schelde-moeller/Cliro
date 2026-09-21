@@ -1,7 +1,28 @@
+import type { CvrAnalysis } from "@prisma/client";
 import { prisma } from "./prisma";
 import { getCompanies, type Company } from "./companies";
 import { brancheDisplayGroup } from "./cvr/branche";
-import type { CvrCompanyRow } from "@/components/leads/CvrBrowser";
+import type { CvrCompanyRow, CvrAnalysisData } from "@/components/leads/CvrBrowser";
+
+// Prisma's Json columns type as the broad `JsonValue` union — cast to the
+// specific shape the AI's structured-output tool guarantees (see
+// src/app/api/cvr/analyze/[cvr]/route.ts's ANALYZE_TOOL), same convention
+// src/lib/companies.ts's rowToCompany already uses for Company's Json
+// fields.
+export function mapCvrAnalysis(row: CvrAnalysis): CvrAnalysisData {
+  return {
+    score: row.score,
+    breakdown: row.breakdown as CvrAnalysisData["breakdown"],
+    tier: row.tier as CvrAnalysisData["tier"],
+    hook: row.hook as CvrAnalysisData["hook"],
+    existing: row.existing,
+    social: row.social,
+    idea: row.idea,
+    contact: row.contact as CvrAnalysisData["contact"],
+    mail: row.mail as CvrAnalysisData["mail"],
+    analyzedAt: row.analyzedAt.toISOString(),
+  };
+}
 
 export type TeamMemberInfo = {
   userId: string;
@@ -106,6 +127,7 @@ export async function getCvrCompanyRows(teamId: string, userId: string, cvrNumme
         where: { list: { teamId, OR: [{ isPrivate: false }, { createdBy: userId }] } },
         select: { listId: true },
       },
+      analysis: true,
     },
   });
   return rows.map((row) => {
@@ -139,6 +161,7 @@ export async function getCvrCompanyRows(teamId: string, userId: string, cvrNumme
       starred: row.stars.length > 0,
       listIds: row.listItems.map((i) => i.listId),
       distanceKm: null,
+      analysis: row.analysis ? mapCvrAnalysis(row.analysis) : null,
     };
   });
 }

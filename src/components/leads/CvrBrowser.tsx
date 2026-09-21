@@ -36,6 +36,27 @@ function SortArrow({ pointingDown }: { pointingDown: boolean }) {
 
 export type CvrPipelineState = { status: string; assigneeId: string | null; assigneeName: string | null };
 
+export type CvrAnalysisData = {
+  score: number;
+  breakdown: { contact: number; news: number; industry: number; creative: number };
+  tier: { key: string; label: string };
+  hook: { title: string; summary: string; date: string; url: string } | null;
+  existing: string;
+  social: string;
+  idea: string;
+  contact: {
+    found: boolean;
+    name: string | null;
+    title: string | null;
+    email: string | null;
+    note: string | null;
+    sourceUrl: string | null;
+    profileUrl: string | null;
+  };
+  mail: { subject: string; body: string };
+  analyzedAt: string;
+};
+
 export type CvrCompanyRow = {
   cvrNummer: string;
   navn: string | null;
@@ -63,6 +84,7 @@ export type CvrCompanyRow = {
   starred: boolean;
   listIds: string[];
   distanceKm: number | null;
+  analysis: CvrAnalysisData | null;
 };
 
 type BrancheFacet = { label: string; kodes: string[]; n: number };
@@ -138,8 +160,17 @@ export function CvrBrowser({
     };
   }, []);
 
-  const { teamLists, handleSetStatus, handleAssign, handleRelease, handleToggleStar, handleToggleList, handleCreateList } =
-    useCvrRowMutations({ teamId, myName, initialTeamLists, setRows, setSelected });
+  const {
+    teamLists,
+    analyzingFor,
+    handleSetStatus,
+    handleAssign,
+    handleRelease,
+    handleToggleStar,
+    handleToggleList,
+    handleCreateList,
+    handleAnalyze,
+  } = useCvrRowMutations({ teamId, myName, initialTeamLists, setRows, setSelected });
 
   const activeFilterCount =
     (branche ? 1 : 0) + (region ? 1 : 0) + (size ? 1 : 0) + (koebekraft ? 1 : 0) + (starredOnly ? 1 : 0) + (myLocation && maxDistance != null ? 1 : 0);
@@ -581,6 +612,7 @@ export function CvrBrowser({
           company={selected}
           myName={myName}
           teamLists={teamLists}
+          analyzing={analyzingFor === selected.cvrNummer}
           onClose={() => setSelected(null)}
           onToggleStar={() => handleToggleStar(selected)}
           onSetStatus={(status) => handleSetStatus(selected, status)}
@@ -588,6 +620,7 @@ export function CvrBrowser({
           onRelease={() => handleRelease(selected)}
           onToggleList={(listId) => handleToggleList(selected, listId)}
           onCreateList={(name) => handleCreateList(selected, name)}
+          onAnalyze={() => handleAnalyze(selected)}
         />
       ) : null}
     </section>
