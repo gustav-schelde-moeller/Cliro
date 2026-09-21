@@ -25,10 +25,7 @@ export function Modal({
       <div className="scrim open" onClick={onClose} />
       <div
         className="modal-panel"
-        style={{
-          ...(maxWidth ? { width: `min(${maxWidth}px, calc(100vw - 32px))` } : undefined),
-          ...(dimmed ? { opacity: 0.4, transition: "opacity 0.15s ease" } : undefined),
-        }}
+        style={maxWidth ? { width: `min(${maxWidth}px, calc(100vw - 32px))` } : undefined}
       >
         <div className="modal-head">
           <div>
@@ -42,6 +39,11 @@ export function Modal({
           </button>
         </div>
         <div className="modal-body">{children}</div>
+        {/* An opaque tint painted over the panel's own (still fully opaque)
+            content, rather than reducing the panel's own opacity — that
+            made the page behind it bleed through into the panel, reading
+            as a ghosting double-exposure instead of a simple dim. */}
+        {dimmed ? <div className="modal-dim-overlay" /> : null}
       </div>
     </>
   );

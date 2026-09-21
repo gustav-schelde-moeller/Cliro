@@ -377,9 +377,6 @@ export function TeamView({
 
       <div className="footer-note">Den første person i et team er automatisk ejer og kan gøre andre til admin herfra.</div>
 
-      {/* Rendered before LeadDrawer/CvrDrawer so that opening a company from
-          inside this list preview stacks visually on top of it — all three
-          drawers share the same z-index, so later-in-DOM wins the tie. */}
       {selectedList ? (
         <TeamListDrawer
           list={selectedList}
@@ -394,39 +391,54 @@ export function TeamView({
         />
       ) : null}
 
-      {selectedCompany ? (
-        <LeadDrawer
-          company={selectedCompany}
-          lead={leadOf(selectedCompany.id)}
-          starred={starred.has(selectedCompany.id)}
-          teamLists={teamLists}
-          listIds={new Set(listMemberships[selectedCompany.id] ?? [])}
-          myName={myName}
-          onClose={() => setSelectedId(null)}
-          onToggleStar={() => handleToggleStar(selectedCompany.id)}
-          onSetStatus={(status) => handleSetStatus(selectedCompany.id, status)}
-          onAssign={() => handleAssign(selectedCompany.id)}
-          onRelease={() => handleRelease(selectedCompany.id)}
-          onToggleList={(listId) => handleToggleList(selectedCompany.id, listId)}
-          onCreateList={(name) => handleCreateList(selectedCompany.id, name)}
-        />
-      ) : null}
+      {/* A company drawer opened from inside TeamListDrawer needs to outrank
+          that modal's own panel entirely — its own scrim, not just its
+          panel. .scrim is z-index:40 and .modal-panel/.drawer are both
+          z-index:41, so a plain DOM-order tie-break only lifts the drawer's
+          *panel* above the modal (they're both 41); the drawer's *scrim*
+          (40) never outranks the modal's panel (41) no matter where it
+          sits in the DOM, since z-index comparisons only fall back to DOM
+          order within equal values. This wrapper's own z-index (50)
+          promotes the whole scrim+panel pair as one unit above the modal,
+          so clicking anywhere over the dimmed modal correctly hits the
+          drawer's scrim and closes it. */}
+      {selectedCompany || selectedCvr ? (
+        <div style={{ position: "relative", zIndex: 50 }}>
+          {selectedCompany ? (
+            <LeadDrawer
+              company={selectedCompany}
+              lead={leadOf(selectedCompany.id)}
+              starred={starred.has(selectedCompany.id)}
+              teamLists={teamLists}
+              listIds={new Set(listMemberships[selectedCompany.id] ?? [])}
+              myName={myName}
+              onClose={() => setSelectedId(null)}
+              onToggleStar={() => handleToggleStar(selectedCompany.id)}
+              onSetStatus={(status) => handleSetStatus(selectedCompany.id, status)}
+              onAssign={() => handleAssign(selectedCompany.id)}
+              onRelease={() => handleRelease(selectedCompany.id)}
+              onToggleList={(listId) => handleToggleList(selectedCompany.id, listId)}
+              onCreateList={(name) => handleCreateList(selectedCompany.id, name)}
+            />
+          ) : null}
 
-      {selectedCvr ? (
-        <CvrDrawer
-          company={selectedCvr}
-          myName={myName}
-          teamLists={cvrTeamLists}
-          analyzing={analyzingFor === selectedCvr.cvrNummer}
-          onClose={() => setSelectedCvr(null)}
-          onToggleStar={() => handleCvrToggleStar(selectedCvr)}
-          onSetStatus={(status) => handleCvrSetStatus(selectedCvr, status)}
-          onAssign={() => handleCvrAssign(selectedCvr)}
-          onRelease={() => handleCvrRelease(selectedCvr)}
-          onToggleList={(listId) => handleCvrToggleList(selectedCvr, listId)}
-          onCreateList={(name) => handleCvrCreateList(selectedCvr, name)}
-          onAnalyze={() => handleAnalyze(selectedCvr)}
-        />
+          {selectedCvr ? (
+            <CvrDrawer
+              company={selectedCvr}
+              myName={myName}
+              teamLists={cvrTeamLists}
+              analyzing={analyzingFor === selectedCvr.cvrNummer}
+              onClose={() => setSelectedCvr(null)}
+              onToggleStar={() => handleCvrToggleStar(selectedCvr)}
+              onSetStatus={(status) => handleCvrSetStatus(selectedCvr, status)}
+              onAssign={() => handleCvrAssign(selectedCvr)}
+              onRelease={() => handleCvrRelease(selectedCvr)}
+              onToggleList={(listId) => handleCvrToggleList(selectedCvr, listId)}
+              onCreateList={(name) => handleCvrCreateList(selectedCvr, name)}
+              onAnalyze={() => handleAnalyze(selectedCvr)}
+            />
+          ) : null}
+        </div>
       ) : null}
     </section>
   );
