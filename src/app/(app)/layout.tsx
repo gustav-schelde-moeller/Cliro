@@ -6,6 +6,7 @@ import { getUserTeams } from "@/lib/queries";
 import { ToastProvider } from "@/components/shared/ToastProvider";
 import { Sidebar } from "@/components/shared/Sidebar";
 import { Topbar } from "@/components/shared/Topbar";
+import { PageShell } from "@/components/shared/PageShell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -36,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="main">
             <Topbar name={user.name} avatarDataUrl={user.avatarDataUrl ?? user.image} />
             <div className="pages">
-              <div className="page enter">{children}</div>
+              <PageShell>{children}</PageShell>
             </div>
           </div>
         </div>

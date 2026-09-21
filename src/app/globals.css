@@ -266,6 +266,7 @@ input,select{ font-family:inherit; }
 .avatar.sm{ width:24px; height:24px; font-size:10.5px; }
 .pages{ flex:1; min-width:0; overflow-y:auto; padding:26px 30px 50px; }
 .page{ max-width:1180px; margin:0 auto; }
+.page.page-wide{ max-width:none; }
 .page-head{ margin-bottom:18px; }
 .page-head h2{ font-size:22px; font-weight:800; margin:0 0 4px; }
 .page-head p{ margin:0; color:var(--text-muted); font-size:13px; }
