@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { STATUS_DEFS, statusLabel } from "@/lib/status";
 import { useToast } from "@/components/shared/ToastProvider";
+import { useBodyScrollLock } from "@/components/shared/useBodyScrollLock";
 import { ListMenu, type TeamListOption } from "./ListMenu";
 import type { CvrCompanyRow } from "./CvrBrowser";
 
@@ -55,6 +56,7 @@ export function CvrDrawer({
 }) {
   const { showToast } = useToast();
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  useBodyScrollLock();
   const pipeline = company.pipeline ?? { status: "new", assigneeId: null, assigneeName: null };
   const address = [company.vejnavn, company.husnummer].filter(Boolean).join(" ");
   const analysis = company.analysis;

@@ -6,6 +6,7 @@ import { STATUS_DEFS, statusLabel } from "@/lib/status";
 import type { LeadState } from "./LeadCard";
 import { ListMenu, type TeamListOption } from "./ListMenu";
 import { useToast } from "@/components/shared/ToastProvider";
+import { useBodyScrollLock } from "@/components/shared/useBodyScrollLock";
 
 function BdRow({ label, value, max, color, display }: { label: string; value: number; max: number; color: string; display?: string }) {
   const pct = Math.round((value / max) * 100);
@@ -51,6 +52,7 @@ export function LeadDrawer({
 }) {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const { showToast } = useToast();
+  useBodyScrollLock();
 
   async function copyText(text: string, label: string, btn: HTMLButtonElement) {
     try {

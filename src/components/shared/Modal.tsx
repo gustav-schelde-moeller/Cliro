@@ -1,5 +1,7 @@
 "use client";
 
+import { useBodyScrollLock } from "./useBodyScrollLock";
+
 export function Modal({
   title,
   subtitle,
@@ -20,6 +22,7 @@ export function Modal({
   // like a second, independently-lit layer stacked underneath.
   dimmed?: boolean;
 }) {
+  useBodyScrollLock();
   return (
     <>
       <div className="scrim open" onClick={onClose} />

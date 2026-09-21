@@ -439,6 +439,11 @@ input,select{ font-family:inherit; }
   border-left:1px solid var(--border); box-shadow:var(--shadow); z-index:41;
   transform:translateX(100%); transition:transform 0.22s ease; display:flex; flex-direction:column;
 }
+/* 100vh on mobile Safari/Chrome is the LARGEST possible viewport (address
+   bar hidden) — with the bar shown, the drawer is taller than what's
+   actually visible, which can push its close button out of view. dvh
+   tracks the real, current viewport; browsers without it just keep 100vh. */
+@supports (height: 100dvh){ .drawer{ height:100dvh; } }
 .drawer.open{ transform:translateX(0); }
 .drawer-head{ padding:18px 20px 14px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
 .drawer-head h2{ font-size:20px; margin:0 0 4px; font-weight:700; }
@@ -452,6 +457,7 @@ input,select{ font-family:inherit; }
   max-height:calc(100vh - 64px); display:flex; flex-direction:column;
   background:var(--surface); border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow); z-index:41;
 }
+@supports (height: 100dvh){ .modal-panel{ max-height:calc(100dvh - 64px); } }
 .modal-dim-overlay{ position:absolute; inset:0; background:rgba(0,0,0,0.4); border-radius:inherit; pointer-events:none; }
 .modal-head{ padding:16px 18px 12px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-shrink:0; }
 .modal-head h3{ font-size:15px; margin:0; font-weight:700; }
@@ -538,10 +544,31 @@ input,select{ font-family:inherit; }
 .list-body-wrap.expanded{ grid-template-rows:1fr; }
 .list-body-wrap > div{ overflow:hidden; min-height:0; }
 .list-table-wrap{ overflow-x:auto; }
-.list-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
-.list-table th{ text-align:left; color:var(--text-faint); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.03em; padding:6px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+/* table-layout:fixed forces the table to stay within its container's width
+   (100%) and distribute it across the columns below, instead of sizing each
+   column to its content's natural, unwrapped width — which is what forced
+   the horizontal scrollbar before. Overflowing text wraps inside its
+   column's fixed width instead (taller rows, never a wider table). */
+.list-table{ width:100%; table-layout:fixed; border-collapse:collapse; font-size:12.5px; }
+.list-table th{ text-align:left; color:var(--text-faint); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.03em; padding:6px 10px; border-bottom:1px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .list-table td{ padding:8px 10px; border-bottom:1px solid var(--border); color:var(--text-muted); overflow-wrap:break-word; }
 .list-table td.cell-primary{ color:var(--text); }
+/* The 9th column only ever holds the "Fjern" button — a % share rounds
+   down to less room than that button needs at most table widths, which
+   pushed it past the column's edge and re-triggered the very horizontal
+   scroll this fixed layout exists to avoid. A fixed px width guarantees
+   the button always fits regardless of how wide the table itself is. */
+.list-table th:nth-child(1), .list-table td:nth-child(1){ width:18%; }
+.list-table th:nth-child(2), .list-table td:nth-child(2){ width:15%; }
+.list-table th:nth-child(3), .list-table td:nth-child(3){ width:9%; }
+.list-table th:nth-child(4), .list-table td:nth-child(4){ width:7%; }
+.list-table th:nth-child(5), .list-table td:nth-child(5){ width:8%; }
+.list-table th:nth-child(6), .list-table td:nth-child(6){ width:13%; }
+.list-table th:nth-child(7), .list-table td:nth-child(7){ width:10%; }
+.list-table th:nth-child(8), .list-table td:nth-child(8){ width:11%; }
+.list-table th:nth-child(9), .list-table td:nth-child(9){ width:68px; }
+.list-table td:nth-child(9){ padding:8px 6px; text-align:right; }
+.list-table td:nth-child(9) .btn{ padding:6px 9px; font-size:12px; }
 .list-table tr:last-child td{ border-bottom:none; }
 .list-table-row{ cursor:pointer; transition:background 0.1s ease; }
 .list-table-row:hover td{ background:var(--surface-2); }
@@ -686,6 +713,36 @@ input,select{ font-family:inherit; }
   .sidebar-nav{ flex-direction:row; flex:none; gap:2px; }
   .nav-item{ flex-direction:column; gap:2px; padding:6px 9px; white-space:nowrap; flex-shrink:0; width:auto; }
   .settings-link{ margin-top:0; border-top:none; padding-top:0; margin-left:2px; flex-shrink:0; width:auto; }
+
+  /* A 9-column table has no room to work with on a phone — even a narrow
+     list card's own content width (~270px once its padding is subtracted)
+     isn't enough for a name and 7 more columns side by side; forcing it
+     into fixed-width columns just breaks single words onto one letter per
+     line instead of scrolling. Below 640px the table becomes a stacked
+     list instead: one card per company, each field on its own line with
+     its column name as a label (from the cell's data-label, the same text
+     the desktop <th> shows), name and status full-width up top. */
+  .list-table-wrap{ overflow-x:visible; }
+  .list-table, .list-table thead, .list-table tbody, .list-table tr{ display:block; width:auto; }
+  .list-table thead{ display:none; }
+  .list-table-row{ display:flex; flex-wrap:wrap; gap:2px 12px; padding:12px 4px; border-bottom:1px solid var(--border); border-radius:10px; }
+  /* Each field is its own flex item now (not a full-width table cell), so
+     the desktop hover rule — background on every individual td — paints a
+     ragged patch behind just the wrapped ones instead of a clean highlight,
+     and touch UAs can leave that state lingering after a tap. Highlight the
+     whole card instead, and only in states a touch UI actually produces. */
+  .list-table-row:hover td, .list-table-row:hover td.cell-primary{ background:none; -webkit-text-stroke:0; }
+  .list-table-row:active{ background:var(--surface-2); }
+  .list-table td{
+    display:flex; width:auto; flex:1 1 auto; min-width:45%; justify-content:space-between; gap:8px;
+    padding:2px 0; border-bottom:none; font-size:12.5px;
+  }
+  .list-table td::before{ content:attr(data-label); color:var(--text-faint); font-size:11px; text-transform:uppercase; letter-spacing:0.03em; flex-shrink:0; }
+  .list-table td.cell-primary{
+    width:100%; flex:1 1 100%; font-size:14.5px; font-weight:600; order:-1; padding-bottom:4px;
+  }
+  .list-table td.cell-primary::before{ content:none; }
+  .list-table td:last-child{ width:100%; flex:1 1 100%; justify-content:flex-end; padding-top:6px; }
 }
 
 @media (max-width:560px){

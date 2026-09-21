@@ -13,8 +13,7 @@ import {
 import { getCompanies, displayScore, displayTier } from "@/lib/companies";
 import { STATUS_DEFS } from "@/lib/status";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
-import { DashboardInProgress } from "@/components/dashboard/DashboardInProgress";
-import { CvrInProgress } from "@/components/dashboard/CvrInProgress";
+import { PipelineInProgress } from "@/components/dashboard/PipelineInProgress";
 import { RegnskabPanel } from "@/components/dashboard/RegnskabPanel";
 
 export default async function DashboardPage() {
@@ -98,24 +97,15 @@ export default async function DashboardPage() {
 
       <div className="panel-card" style={{ marginTop: 16 }}>
         <h3>Virksomheder i gang</h3>
-        <DashboardInProgress
+        <PipelineInProgress
           companies={activeCompanies}
+          cvrCompanies={activeCvrCompanies}
           teamId={teamId}
           myName={session.user.name ?? "Ukendt"}
           initialLeads={activeLeads}
           initialStars={[...userStars]}
           initialTeamLists={teamLists.map((l) => ({ id: l.id, name: l.name }))}
           initialListMemberships={listMembershipsPlain}
-        />
-      </div>
-
-      <div className="panel-card" style={{ marginTop: 16 }}>
-        <h3>CVR-virksomheder i gang</h3>
-        <CvrInProgress
-          companies={activeCvrCompanies}
-          teamId={teamId}
-          myName={session.user.name ?? "Ukendt"}
-          initialTeamLists={teamLists.map((l) => ({ id: l.id, name: l.name }))}
         />
       </div>
     </section>

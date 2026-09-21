@@ -315,14 +315,14 @@ export function ListsView({
                               className={`list-table-row${companyDrawerOpen ? " list-table-row-disabled" : ""}`}
                               onClick={companyDrawerOpen ? undefined : () => setSelectedId(c.id)}
                             >
-                              <td className="cell-primary">{c.name}</td>
-                              <td>{c.industry}</td>
-                              <td>{c.city}</td>
-                              <td>{displayScore(c)}</td>
-                              <td>—</td>
-                              <td>{c.contact.name ?? "—"}</td>
-                              <td>—</td>
-                              <td>{c.contact.email ?? "—"}</td>
+                              <td className="cell-primary" data-label="Navn">{c.name}</td>
+                              <td data-label="Branche">{c.industry}</td>
+                              <td data-label="By">{c.city}</td>
+                              <td data-label="Score">{displayScore(c)}</td>
+                              <td data-label="Købekraft">—</td>
+                              <td data-label="Kontakt">{c.contact.name ?? "—"}</td>
+                              <td data-label="Telefon">—</td>
+                              <td data-label="Email">{c.contact.email ?? "—"}</td>
                               <td>
                                 {canEdit ? (
                                   <button
@@ -348,14 +348,14 @@ export function ListsView({
                                 className={`list-table-row${openable ? "" : " list-table-row-disabled"}`}
                                 onClick={openable ? () => openCvrByNummer(c.cvrNummer) : undefined}
                               >
-                                <td className="cell-primary">{c.navn || "Ukendt navn"}</td>
-                                <td>{c.brancheTekst ?? "—"}</td>
-                                <td>{c.kommunenavn ?? "—"}</td>
-                                <td>—</td>
-                                <td>{c.koebekraftScore ?? "—"}</td>
-                                <td>—</td>
-                                <td>{c.telefon ?? "—"}</td>
-                                <td>{c.email ?? "—"}</td>
+                                <td className="cell-primary" data-label="Navn">{c.navn || "Ukendt navn"}</td>
+                                <td data-label="Branche">{c.brancheTekst ?? "—"}</td>
+                                <td data-label="By">{c.kommunenavn ?? "—"}</td>
+                                <td data-label="Score">—</td>
+                                <td data-label="Købekraft">{c.koebekraftScore ?? "—"}</td>
+                                <td data-label="Kontakt">—</td>
+                                <td data-label="Telefon">{c.telefon ?? "—"}</td>
+                                <td data-label="Email">{c.email ?? "—"}</td>
                                 <td>
                                   {canEdit ? (
                                     <button
