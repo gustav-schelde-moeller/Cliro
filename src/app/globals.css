@@ -407,7 +407,7 @@ input,select{ font-family:inherit; }
 .list-btn:hover{ color:var(--accent); }
 .list-btn.has-lists{ color:var(--accent); }
 .list-dropdown{
-  display:flex; flex-direction:column; gap:2px; position:absolute; top:26px; right:0; z-index:20; min-width:200px;
+  display:flex; flex-direction:column; gap:2px; position:absolute; top:26px; right:0; z-index:45; min-width:200px;
   background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); padding:6px;
   animation:dropdownIn 0.12s ease both;
 }
@@ -534,7 +534,7 @@ input,select{ font-family:inherit; }
 .list-table-wrap{ overflow-x:auto; }
 .list-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
 .list-table th{ text-align:left; color:var(--text-faint); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.03em; padding:6px 10px; border-bottom:1px solid var(--border); }
-.list-table td{ padding:8px 10px; border-bottom:1px solid var(--border); color:var(--text-muted); white-space:nowrap; }
+.list-table td{ padding:8px 10px; border-bottom:1px solid var(--border); color:var(--text-muted); overflow-wrap:break-word; }
 .list-table tr:last-child td{ border-bottom:none; }
 .list-table-row{ cursor:pointer; transition:background 0.1s ease; }
 .list-table-row:hover td{ background:var(--surface-2); }
