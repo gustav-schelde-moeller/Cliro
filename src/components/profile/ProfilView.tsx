@@ -91,8 +91,10 @@ export function ProfilView({
   }
 
   return (
-    <section>
-      <div className="panel-card" style={{ maxWidth: 520, marginBottom: 16 }}>
+    <section
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 220px)" }}
+    >
+      <div className="panel-card" style={{ maxWidth: 520, width: "100%" }}>
         <div className="profil-row">
           <div>
             <div className="label">Profilbillede</div>
