@@ -6,6 +6,7 @@ import { Avatar } from "./Avatar";
 const TITLES: Record<string, string> = {
   "/virksomheder": "Virksomheder",
   "/dashboard": "Dashboard",
+  "/lister": "Lister",
   "/team": "Team",
   "/profil": "Profil",
 };
