@@ -258,6 +258,7 @@ export function ListsView({
                             <th>Score</th>
                             <th>Købekraft</th>
                             <th>Kontakt</th>
+                            <th>Telefon</th>
                             <th>Email</th>
                             <th />
                           </tr>
@@ -271,6 +272,7 @@ export function ListsView({
                               <td>{c.score}</td>
                               <td>—</td>
                               <td>{c.contact.name ?? "—"}</td>
+                              <td>—</td>
                               <td>{c.contact.email ?? "—"}</td>
                               <td>
                                 <button
@@ -294,6 +296,7 @@ export function ListsView({
                               <td>{c.kommunenavn ?? "—"}</td>
                               <td>—</td>
                               <td>{c.koebekraftScore ?? "—"}</td>
+                              <td>—</td>
                               <td>{c.telefon ?? "—"}</td>
                               <td>{c.email ?? "—"}</td>
                               <td>
