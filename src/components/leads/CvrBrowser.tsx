@@ -1,11 +1,38 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
 import { STATUS_DEFS, statusLabel } from "@/lib/status";
 import { CvrDrawer } from "./CvrDrawer";
 import { ListMenu, type TeamListOption } from "./ListMenu";
 import { useCvrRowMutations } from "./useCvrRowMutations";
+
+const STATUS_CLOSE_DELAY_MS = 350;
+
+// Columns whose first-click direction is ascending (A–Å / lowest-first) —
+// everything else defaults to descending (highest-first) on first click.
+const ASC_DEFAULT_SORT_KEYS = new Set(["navn", "brancheTekst", "region"]);
+
+function SortArrow({ pointingDown }: { pointingDown: boolean }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      width={11}
+      height={11}
+      fill="none"
+      style={{
+        marginLeft: 5,
+        verticalAlign: "middle",
+        transition: "transform 0.15s ease",
+        transform: pointingDown ? "none" : "rotate(180deg)",
+      }}
+    >
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 export type CvrPipelineState = { status: string; assigneeId: string | null; assigneeName: string | null };
 
@@ -87,9 +114,29 @@ export function CvrBrowser({
   const [selected, setSelected] = useState<CvrCompanyRow | null>(null);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [openStatusFor, setOpenStatusFor] = useState<string | null>(null);
+  const [statusMenuPos, setStatusMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [myLocation, setMyLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [maxDistance, setMaxDistance] = useState<number | null>(null);
   const [locating, setLocating] = useState(false);
+  const statusCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function cancelStatusClose() {
+    if (statusCloseTimer.current) {
+      clearTimeout(statusCloseTimer.current);
+      statusCloseTimer.current = null;
+    }
+  }
+
+  function scheduleStatusClose() {
+    cancelStatusClose();
+    statusCloseTimer.current = setTimeout(() => setOpenStatusFor(null), STATUS_CLOSE_DELAY_MS);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (statusCloseTimer.current) clearTimeout(statusCloseTimer.current);
+    };
+  }, []);
 
   const { teamLists, handleSetStatus, handleAssign, handleRelease, handleToggleStar, handleToggleList, handleCreateList } =
     useCvrRowMutations({ teamId, myName, initialTeamLists, setRows, setSelected });
@@ -190,21 +237,21 @@ export function CvrBrowser({
       setDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSort(key);
-      setDir(key === "navn" || key === "brancheTekst" || key === "region" ? "asc" : "desc");
+      setDir(ASC_DEFAULT_SORT_KEYS.has(key) ? "asc" : "desc");
     }
     resetPaging();
   }
 
+  // The arrow always points down on a column's first click (its natural
+  // default direction — A–Å for text columns, highest-first for numeric
+  // ones) and flips to point up once you click again to reverse it, rather
+  // than literally mapping asc/desc to a fixed direction — that would make
+  // Navn's first click point up while every numeric column's first click
+  // points down, which reads as inconsistent.
   function sortIndicator(key: string) {
     if (sort !== key) return null;
-    return (
-      <span
-        aria-hidden
-        style={{ display: "inline-block", marginLeft: 4, transition: "transform 0.15s ease", transform: dir === "asc" ? "rotate(180deg)" : "none" }}
-      >
-        ▼
-      </span>
-    );
+    const isDefaultDir = dir === (ASC_DEFAULT_SORT_KEYS.has(key) ? "asc" : "desc");
+    return <SortArrow pointingDown={isDefaultDir} />;
   }
 
   function requestLocation() {
@@ -459,33 +506,49 @@ export function CvrBrowser({
                   <td>{c.koebekraftScore ?? "—"}</td>
                   {myLocation ? <td>{c.distanceKm != null ? `${Math.round(c.distanceKm)} km` : "—"}</td> : null}
                   <td onClick={(e) => e.stopPropagation()}>
-                    <div className="status-menu">
+                    <div className="status-menu" onMouseEnter={cancelStatusClose} onMouseLeave={scheduleStatusClose}>
                       <button
                         type="button"
                         className="status-pill"
                         data-status={c.pipeline?.status ?? "new"}
-                        onClick={() => setOpenStatusFor((v) => (v === c.cvrNummer ? null : c.cvrNummer))}
+                        onClick={(e) => {
+                          if (openStatusFor === c.cvrNummer) {
+                            setOpenStatusFor(null);
+                            return;
+                          }
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setStatusMenuPos({ top: rect.bottom + 6, left: rect.left });
+                          setOpenStatusFor(c.cvrNummer);
+                        }}
                       >
                         {statusLabel(c.pipeline?.status ?? "new")} ▾
                       </button>
-                      {openStatusFor === c.cvrNummer ? (
-                        <div className="status-dropdown" style={{ display: "flex" }}>
-                          {STATUS_DEFS.map((s) => (
-                            <button
-                              key={s.key}
-                              type="button"
-                              className="status-opt"
-                              onClick={() => {
-                                setOpenStatusFor(null);
-                                handleSetStatus(c, s.key);
-                              }}
+                      {openStatusFor === c.cvrNummer && statusMenuPos
+                        ? createPortal(
+                            <div
+                              className="status-dropdown"
+                              style={{ position: "fixed", top: statusMenuPos.top, left: statusMenuPos.left, display: "flex" }}
+                              onMouseEnter={cancelStatusClose}
+                              onMouseLeave={scheduleStatusClose}
                             >
-                              <span className={`status-dot ${s.key}`} />
-                              {s.label}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
+                              {STATUS_DEFS.map((s) => (
+                                <button
+                                  key={s.key}
+                                  type="button"
+                                  className="status-opt"
+                                  onClick={() => {
+                                    setOpenStatusFor(null);
+                                    handleSetStatus(c, s.key);
+                                  }}
+                                >
+                                  <span className={`status-dot ${s.key}`} />
+                                  {s.label}
+                                </button>
+                              ))}
+                            </div>,
+                            document.body,
+                          )
+                        : null}
                     </div>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>

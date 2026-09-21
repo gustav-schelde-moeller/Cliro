@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { haversineKm, type Company } from "@/lib/companies";
+import { displayScore, haversineKm, type Company } from "@/lib/companies";
 import { LeadCard, type LeadState, type TeamListOption } from "./LeadCard";
 import { LeadDrawer } from "./LeadDrawer";
 import { useLeadMutations } from "./useLeadMutations";
@@ -105,7 +105,7 @@ export function VirksomhederView({
       return true;
     });
     const copy = list.slice();
-    if (sort === "score") copy.sort((a, b) => b.score - a.score);
+    if (sort === "score") copy.sort((a, b) => displayScore(b) - displayScore(a));
     else if (sort === "recent") copy.sort((a, b) => b.dateRank - a.dateRank);
     else if (sort === "added") copy.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     else if (sort === "name") copy.sort((a, b) => a.name.localeCompare(b.name, "da"));

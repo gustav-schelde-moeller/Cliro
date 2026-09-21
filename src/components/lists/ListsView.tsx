@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { Company } from "@/lib/companies";
+import { displayScore, type Company } from "@/lib/companies";
 import type { LeadState } from "@/components/leads/LeadCard";
 import type { TeamListOption } from "@/components/leads/ListMenu";
 import { LeadDrawer } from "@/components/leads/LeadDrawer";
@@ -269,7 +269,7 @@ export function ListsView({
                               <td>{c.name}</td>
                               <td>{c.industry}</td>
                               <td>{c.city}</td>
-                              <td>{c.score}</td>
+                              <td>{displayScore(c)}</td>
                               <td>—</td>
                               <td>{c.contact.name ?? "—"}</td>
                               <td>—</td>

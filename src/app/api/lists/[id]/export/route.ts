@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getCompanies } from "@/lib/companies";
+import { displayScore, getCompanies } from "@/lib/companies";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: listId } = await params;
@@ -74,7 +74,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       name: c.name,
       industry: c.industry,
       city: c.city,
-      score: c.score,
+      score: displayScore(c),
       contactName: c.contact.name ?? "",
       contactTitle: c.contact.title ?? "",
       email: c.contact.email ?? "",

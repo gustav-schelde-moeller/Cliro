@@ -81,6 +81,53 @@ export async function getCompanies(): Promise<Company[]> {
   return rows.map(rowToCompany);
 }
 
+// Danish month names, for parsing hook.date strings like "23. marts 2026".
+const DA_MONTHS: Record<string, number> = {
+  januar: 0,
+  februar: 1,
+  marts: 2,
+  april: 3,
+  maj: 4,
+  juni: 5,
+  juli: 6,
+  august: 7,
+  september: 8,
+  oktober: 9,
+  november: 10,
+  december: 11,
+};
+
+// hook.date is free text written by the research AI — usually a specific,
+// past-tense date ("23. marts 2026") but sometimes a vague future
+// description ("Åbner medio august 2026"). Only the former is safe to treat
+// as "how old is this news"; anything else falls back to createdAt below.
+function parseDanishDate(text: string): Date | null {
+  const m = text.match(/(\d{1,2})\.\s*([a-zæøå]+)\s*(\d{4})/i);
+  if (!m) return null;
+  const month = DA_MONTHS[m[2].toLowerCase()];
+  if (month === undefined) return null;
+  return new Date(Number(m[3]), month, Number(m[1]));
+}
+
+const SCORE_HALF_LIFE_DAYS = 45;
+const SCORE_DECAY_FLOOR = 15;
+
+// A lead's score should reflect how good a reason it is to reach out TODAY —
+// a hot news angle from 6 months ago isn't hot anymore, even if the
+// research score was high when it was first found. Score decays with a
+// ~45-day half-life toward a floor (never to 0 — the underlying
+// company/industry fit is still worth something once the specific news
+// trigger has gone stale), anchored to hook.date when it parses as a real
+// date, or to createdAt (when the lead was found) otherwise. The original
+// `score` field is left untouched as the historical research record.
+export function displayScore(company: Pick<Company, "score" | "hook" | "createdAt">, now: Date = new Date()): number {
+  const anchor = parseDanishDate(company.hook.date) ?? new Date(company.createdAt);
+  const ageDays = Math.max(0, (now.getTime() - anchor.getTime()) / 86_400_000);
+  const decay = Math.pow(0.5, ageDays / SCORE_HALF_LIFE_DAYS);
+  const decayed = SCORE_DECAY_FLOOR + (company.score - SCORE_DECAY_FLOOR) * decay;
+  return Math.round(Math.max(0, Math.min(100, decayed)));
+}
+
 export async function getCompanyById(id: number): Promise<Company | undefined> {
   const row = await prisma.company.findUnique({ where: { id } });
   return row ? rowToCompany(row) : undefined;
