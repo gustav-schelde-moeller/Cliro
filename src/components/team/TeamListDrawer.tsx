@@ -110,9 +110,9 @@ export function TeamListDrawer({
                   <td data-label="Branche">{c.industry}</td>
                   <td data-label="By">{c.city}</td>
                   <td data-label="Score">{displayScore(c)}</td>
-                  <td data-label="Købekraft">—</td>
+                  <td className="cell-na" data-label="Købekraft">—</td>
                   <td data-label="Kontakt">{c.contact.name ?? "—"}</td>
-                  <td data-label="Telefon">—</td>
+                  <td className="cell-na" data-label="Telefon">—</td>
                   <td data-label="Email">{c.contact.email ?? "—"}</td>
                   <td>
                     {canEdit ? (
@@ -142,9 +142,9 @@ export function TeamListDrawer({
                     <td className="cell-primary" data-label="Navn">{c.navn || "Ukendt navn"}</td>
                     <td data-label="Branche">{c.brancheTekst ?? "—"}</td>
                     <td data-label="By">{c.kommunenavn ?? "—"}</td>
-                    <td data-label="Score">—</td>
+                    <td className="cell-na" data-label="Score">—</td>
                     <td data-label="Købekraft">{c.koebekraftScore ?? "—"}</td>
-                    <td data-label="Kontakt">—</td>
+                    <td className="cell-na" data-label="Kontakt">—</td>
                     <td data-label="Telefon">{c.telefon ?? "—"}</td>
                     <td data-label="Email">{c.email ?? "—"}</td>
                     <td>

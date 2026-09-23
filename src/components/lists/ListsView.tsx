@@ -43,6 +43,10 @@ type ListItem = {
   cvrCompanies: CvrListCompany[];
 };
 
+function formatDate(iso: string): string {
+  return new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
+}
+
 export function ListsView({
   teamId,
   myName,
@@ -203,28 +207,33 @@ export function ListsView({
   function renderList(list: ListItem, i: number) {
     const isExpanded = expandedIds.has(list.id);
     const canEdit = list.isMine || (!list.isPrivate && list.teamCanEdit);
+    const total = list.companies.length + list.cvrCompanies.length;
+    const meta = [
+      `${total} ${total === 1 ? "virksomhed" : "virksomheder"}`,
+      !list.isMine && list.createdByName ? `Oprettet af ${list.createdByName}` : null,
+      formatDate(list.createdAt),
+    ].filter(Boolean);
     return (
       <div
-        className="panel-card list-card-anim"
-        style={{ marginBottom: 16, animationDelay: `${Math.min(i, 8) * 40}ms` }}
+        className={`panel-card list-card list-card-anim${isExpanded ? " expanded" : ""}${list.isMine ? " mine" : ""}`}
+        style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
         key={list.id}
       >
-        <div className="list-header-row" onClick={() => toggleExpanded(list.id)}>
-          <div className="list-header-title">
-            <svg
-              className={`list-chevron${isExpanded ? " open" : ""}`}
-              viewBox="0 0 24 24"
-              fill="none"
-              width={14}
-              height={14}
-            >
-              <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <div className="list-card-head" onClick={() => toggleExpanded(list.id)}>
+          <div className="list-icon" aria-hidden>
+            <svg viewBox="0 0 24 24" fill="none" width={18} height={18}>
+              <path d="M9 6h11M9 12h11M9 18h11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="4.5" cy="6" r="1.4" fill="currentColor" />
+              <circle cx="4.5" cy="12" r="1.4" fill="currentColor" />
+              <circle cx="4.5" cy="18" r="1.4" fill="currentColor" />
             </svg>
-            <h3 className="list-name-link">{list.name}</h3>
-            <span className="tag">
-              {list.companies.length + list.cvrCompanies.length} {list.companies.length + list.cvrCompanies.length === 1 ? "virksomhed" : "virksomheder"}
-            </span>
-            {list.isPrivate ? <span className="tag">🔒 Privat</span> : null}
+          </div>
+          <div className="list-card-main">
+            <div className="list-card-title-row">
+              <h3 className="list-card-title">{list.name}</h3>
+              {list.isPrivate ? <span className="tag">🔒 Privat</span> : null}
+            </div>
+            <div className="list-card-meta">{meta.join(" · ")}</div>
           </div>
           <div className="list-header-actions" onClick={(e) => e.stopPropagation()}>
             <ListActionsMenu
@@ -238,17 +247,17 @@ export function ListsView({
               onDelete={() => handleDelete(list.id)}
             />
           </div>
+          <svg className={`list-chevron${isExpanded ? " open" : ""}`} viewBox="0 0 24 24" fill="none" width={16} height={16}>
+            <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </div>
-        {!list.isMine && list.createdByName ? <div className="distance-note list-created-note">Oprettet af {list.createdByName}</div> : null}
         <div className={`list-body-wrap${isExpanded ? " expanded" : ""}`}>
-          <div>
+          <div className="list-card-body">
             {list.companies.length === 0 && list.cvrCompanies.length === 0 ? (
-              <div className="dash-empty" style={{ marginTop: 12 }}>
-                Ingen virksomheder i denne liste endnu.
-              </div>
+              <div className="dash-empty">Ingen virksomheder i denne liste endnu.</div>
             ) : null}
             {list.companies.length > 0 || list.cvrCompanies.length > 0 ? (
-              <div className="list-table-wrap" style={{ marginTop: 12 }}>
+              <div className="list-table-wrap">
                 <table className="list-table">
                   <thead>
                     <tr>
@@ -274,9 +283,9 @@ export function ListsView({
                         <td data-label="Branche">{c.industry}</td>
                         <td data-label="By">{c.city}</td>
                         <td data-label="Score">{displayScore(c)}</td>
-                        <td data-label="Købekraft">—</td>
+                        <td className="cell-na" data-label="Købekraft">—</td>
                         <td data-label="Kontakt">{c.contact.name ?? "—"}</td>
-                        <td data-label="Telefon">—</td>
+                        <td className="cell-na" data-label="Telefon">—</td>
                         <td data-label="Email">{c.contact.email ?? "—"}</td>
                         <td>
                           {canEdit ? (
@@ -306,9 +315,9 @@ export function ListsView({
                           <td className="cell-primary" data-label="Navn">{c.navn || "Ukendt navn"}</td>
                           <td data-label="Branche">{c.brancheTekst ?? "—"}</td>
                           <td data-label="By">{c.kommunenavn ?? "—"}</td>
-                          <td data-label="Score">—</td>
+                          <td className="cell-na" data-label="Score">—</td>
                           <td data-label="Købekraft">{c.koebekraftScore ?? "—"}</td>
-                          <td data-label="Kontakt">—</td>
+                          <td className="cell-na" data-label="Kontakt">—</td>
                           <td data-label="Telefon">{c.telefon ?? "—"}</td>
                           <td data-label="Email">{c.email ?? "—"}</td>
                           <td>
@@ -389,17 +398,16 @@ export function ListsView({
           </div>
         </div>
       ) : (
-        sections.map((section, sectionIndex) => (
-          <div key={section.key} style={sectionIndex > 0 ? { marginTop: 28 } : undefined}>
-            <div className="section-label" style={{ marginTop: 0 }}>
-              {section.title} · {section.items.length}
+        sections.map((section) => (
+          <div key={section.key} className="lists-section">
+            <div className="lists-section-head">
+              <span>{section.title}</span>
+              <span className="lists-section-count">{section.items.length}</span>
             </div>
             {section.items.length === 0 ? (
-              <div className="panel-card list-card-anim" style={{ marginBottom: 16 }}>
-                <div className="dash-empty">{section.empty}</div>
-              </div>
+              <div className="lists-section-empty">{section.empty}</div>
             ) : (
-              section.items.map(renderList)
+              <div className="list">{section.items.map(renderList)}</div>
             )}
           </div>
         ))

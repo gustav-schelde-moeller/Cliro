@@ -540,10 +540,42 @@ input,select{ font-family:inherit; }
 .list-header-row:hover .list-name-link{ text-decoration-color:var(--accent); color:var(--accent); }
 .list-created-note{ margin-left:23px; margin-top:2px; }
 .list-header-actions{ display:flex; gap:8px; align-items:flex-start; flex-shrink:0; margin-left:auto; }
+
+/* ===== Lister page cards ===== */
+.lists-section + .lists-section{ margin-top:30px; }
+.lists-section-head{
+  display:flex; align-items:center; gap:8px; margin:0 0 10px; font-size:11.5px; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.06em; color:var(--text-faint);
+}
+.lists-section-count{
+  font-family:var(--font-mono); font-size:11px; font-weight:600; letter-spacing:0; color:var(--text-muted);
+  background:var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:0 8px; line-height:18px;
+}
+.lists-section-empty{ padding:22px 16px; text-align:center; font-size:13px; color:var(--text-faint); border:1px dashed var(--border); border-radius:18px; }
+.list-card{ padding:0; border-radius:18px; overflow:hidden; transition:border-color 0.15s ease, box-shadow 0.15s ease; }
+.list-card:hover{ border-color:color-mix(in srgb, var(--accent) 45%, var(--border)); box-shadow:var(--shadow-sm); }
+.list-card.expanded{ border-color:color-mix(in srgb, var(--accent) 55%, var(--border)); box-shadow:var(--shadow-sm); }
+.list-card-head{ display:flex; align-items:center; gap:14px; padding:14px 14px 14px 16px; cursor:pointer; }
+.list-icon{
+  width:40px; height:40px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  background:var(--surface-2); color:var(--text-muted); border:1px solid var(--border);
+}
+.list-card.mine .list-icon{ background:var(--accent-soft); color:var(--accent); border-color:transparent; }
+.list-card-main{ flex:1; min-width:0; }
+.list-card-title-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.list-card .list-card-title{
+  margin:0; font-size:15px; font-weight:700; color:var(--text); text-transform:none; letter-spacing:0;
+  line-height:1.3; overflow-wrap:anywhere; transition:color 0.12s ease;
+}
+.list-card-head:hover .list-card-title{ color:var(--accent); }
+.list-card-meta{ margin-top:3px; font-size:12px; color:var(--text-muted); }
+.list-card-body{ padding:0 16px; }
+.list-card-body > *{ border-top:1px solid var(--border); margin-bottom:10px; }
+.list-card-body > .list-table-wrap{ padding-top:4px; }
 .list-body-wrap{ display:grid; grid-template-rows:0fr; transition:grid-template-rows 0.22s ease; }
 .list-body-wrap.expanded{ grid-template-rows:1fr; }
 .list-body-wrap > div{ overflow:hidden; min-height:0; }
-.list-table-wrap{ overflow-x:auto; }
+.list-table-wrap{ overflow-x:auto; container:list-table / inline-size; }
 /* table-layout:fixed forces the table to stay within its container's width
    (100%) and distribute it across the columns below, instead of sizing each
    column to its content's natural, unwrapped width — which is what forced
@@ -714,35 +746,55 @@ input,select{ font-family:inherit; }
   .nav-item{ flex-direction:column; gap:2px; padding:6px 9px; white-space:nowrap; flex-shrink:0; width:auto; }
   .settings-link{ margin-top:0; border-top:none; padding-top:0; margin-left:2px; flex-shrink:0; width:auto; }
 
-  /* A 9-column table has no room to work with on a phone — even a narrow
-     list card's own content width (~270px once its padding is subtracted)
-     isn't enough for a name and 7 more columns side by side; forcing it
-     into fixed-width columns just breaks single words onto one letter per
-     line instead of scrolling. Below 640px the table becomes a stacked
-     list instead: one card per company, each field on its own line with
-     its column name as a label (from the cell's data-label, the same text
-     the desktop <th> shows), name and status full-width up top. */
-  .list-table-wrap{ overflow-x:visible; }
+  .list-card-head{ gap:10px; padding:12px 10px 12px 12px; }
+  .list-icon{ width:34px; height:34px; border-radius:10px; }
+  .list-card-body{ padding:0 12px; }
+}
+
+/* A 9-column table needs ~720px to read; below that, forcing it into
+   fixed-width columns breaks single words onto one letter per line. So
+   when the table's own container (not the viewport — the same table sits
+   in a full-width page card, a 920px modal, and a phone) is narrower than
+   that, it becomes a stacked list: one card per company, each field on its
+   own line labeled from the cell's data-label, name full-width up top. */
+@container list-table (max-width: 720px){
   .list-table, .list-table thead, .list-table tbody, .list-table tr{ display:block; width:auto; }
   .list-table thead{ display:none; }
-  .list-table-row{ display:flex; flex-wrap:wrap; gap:2px 12px; padding:12px 4px; border-bottom:1px solid var(--border); border-radius:10px; }
-  /* Each field is its own flex item now (not a full-width table cell), so
+  /* Selectors below carry `tr.list-table-row` so they outrank the desktop
+     per-column rules (`.list-table td:nth-child(n)` widths/padding), which
+     would otherwise shrink each field to its desktop column's percentage. */
+  .list-table tr.list-table-row{
+    display:grid; grid-template-columns:minmax(0,1fr); gap:3px 24px; padding:12px 4px;
+    border-bottom:1px solid var(--border); border-radius:10px;
+  }
+  /* Each field is its own grid item now (not a full-width table cell), so
      the desktop hover rule — background on every individual td — paints a
-     ragged patch behind just the wrapped ones instead of a clean highlight,
-     and touch UAs can leave that state lingering after a tap. Highlight the
+     ragged patch behind just some of them instead of a clean highlight, and
+     touch UAs can leave that state lingering after a tap. Highlight the
      whole card instead, and only in states a touch UI actually produces. */
   .list-table-row:hover td, .list-table-row:hover td.cell-primary{ background:none; -webkit-text-stroke:0; }
   .list-table-row:active{ background:var(--surface-2); }
-  .list-table td{
-    display:flex; width:auto; flex:1 1 auto; min-width:45%; justify-content:space-between; gap:8px;
-    padding:2px 0; border-bottom:none; font-size:12.5px;
+  .list-table tr.list-table-row td{
+    display:grid; grid-template-columns:78px minmax(0,1fr); align-items:baseline; gap:10px;
+    width:auto; padding:1px 0; border-bottom:none; font-size:12.5px; text-align:left;
   }
-  .list-table td::before{ content:attr(data-label); color:var(--text-faint); font-size:11px; text-transform:uppercase; letter-spacing:0.03em; flex-shrink:0; }
-  .list-table td.cell-primary{
-    width:100%; flex:1 1 100%; font-size:14.5px; font-weight:600; order:-1; padding-bottom:4px;
+  .list-table tr.list-table-row td::before{
+    content:attr(data-label); color:var(--text-faint); font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em;
   }
-  .list-table td.cell-primary::before{ content:none; }
-  .list-table td:last-child{ width:100%; flex:1 1 100%; justify-content:flex-end; padding-top:6px; }
+  /* Fields that never apply to this row's type (Score on a CVR company,
+     Købekraft on an AI lead, …) are always "—" — a column the desktop
+     table needs for alignment, but pure noise on a stacked card. */
+  .list-table tr.list-table-row td.cell-na{ display:none; }
+  .list-table tr.list-table-row{ position:relative; }
+  .list-table tr.list-table-row td.cell-primary{
+    display:block; grid-column:1/-1; font-size:14.5px; font-weight:600; padding:0 72px 4px 0;
+  }
+  .list-table tr.list-table-row td.cell-primary::before{ content:none; }
+  .list-table tr.list-table-row td:last-child{ display:block; position:absolute; top:8px; right:4px; padding:0; }
+  .list-table tr.list-table-row td:last-child::before{ content:none; }
+}
+@container list-table (min-width: 460px) and (max-width: 720px){
+  .list-table tr.list-table-row{ grid-template-columns:repeat(2, minmax(0,1fr)); }
 }
 
 @media (max-width:560px){
