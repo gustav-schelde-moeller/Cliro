@@ -195,7 +195,7 @@ input,select{ font-family:inherit; }
 .member-leads{ display:flex; flex-direction:column; gap:6px; margin-left:33px; min-width:0; }
 .member-lead-row{
   display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted); cursor:pointer;
-  border-radius:8px; padding:4px 6px; margin:-4px -6px; transition:background 0.1s ease; flex-wrap:wrap; min-width:0;
+  border-radius:8px; padding:4px 6px; margin:-4px 0 -4px -6px; transition:background 0.1s ease; flex-wrap:wrap; min-width:0;
 }
 .member-lead-row:hover{ background:var(--surface-2); }
 
@@ -447,7 +447,8 @@ input,select{ font-family:inherit; }
 .drawer.open{ transform:translateX(0); }
 .drawer-head{ padding:18px 20px 14px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
 .drawer-head h2{ font-size:20px; margin:0 0 4px; font-weight:700; }
-.drawer-head .tag{ margin-right:6px; }
+.drawer-head > div:first-child{ min-width:0; }
+.drawer-head .tag{ display:inline-block; margin:0 6px 4px 0; max-width:100%; overflow-wrap:anywhere; }
 .drawer-head-actions{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
 .drawer-close{ background:var(--surface-2); border:1px solid var(--border); color:var(--text-muted); width:30px; height:30px; border-radius:9px; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 .drawer-close:hover{ color:var(--text); border-color:var(--accent); }
@@ -603,8 +604,35 @@ input,select{ font-family:inherit; }
    company name instead of being shared out evenly. */
 .cvr-table th:first-child, .cvr-table td:first-child{ width:34px; padding-left:8px; padding-right:0; }
 .cvr-table td{ white-space:nowrap; }
-.cvr-table td.cell-primary{ white-space:normal; min-width:240px; }
+.cvr-table td.cell-primary{ white-space:normal; min-width:200px; }
 .cvr-table th:last-child, .cvr-table td:last-child{ width:40px; }
+.cvr-table td.cvr-c-summary{ display:none; }
+
+/* CVR search's full row needs ~960px; narrower than that, its right-hand
+   columns (status, the lists folder) got pushed out of view behind a
+   sideways scroll. Below that width each row becomes two lines instead:
+   star, name, status and folder on top — always visible — and the
+   secondary columns as one muted summary line underneath. Sorting stays
+   available from the "Sortér" menu while the column headers are hidden. */
+@container list-table (max-width: 960px){
+  .cvr-table, .cvr-table tbody{ display:block; width:auto; }
+  .cvr-table thead{ display:none; }
+  .cvr-table tr.list-table-row{
+    display:flex; flex-wrap:wrap; align-items:center; column-gap:10px; row-gap:3px;
+    padding:10px 6px; border-bottom:1px solid var(--border); border-radius:10px;
+  }
+  .cvr-table tr.list-table-row td{ display:block; width:auto; padding:0; border-bottom:none; }
+  .cvr-table tr.list-table-row td.cvr-c-meta{ display:none; }
+  .cvr-table tr.list-table-row td.cvr-c-star{ order:1; width:24px; flex-shrink:0; }
+  .cvr-table tr.list-table-row td.cell-primary{ order:2; flex:1 1 0; min-width:0; font-size:13.5px; font-weight:600; }
+  .cvr-table tr.list-table-row td.cvr-c-status{ order:3; flex-shrink:0; }
+  .cvr-table tr.list-table-row td.cvr-c-lists{ order:4; flex-shrink:0; }
+  .cvr-table tr.list-table-row td.cvr-c-summary{
+    display:block; order:5; flex:1 1 100%; padding-left:34px; font-size:12px; color:var(--text-muted); white-space:normal;
+  }
+  .cvr-table .list-table-row:hover td{ background:none; }
+  .cvr-table .list-table-row:hover{ background:var(--surface-2); }
+}
 .list-table tr:last-child td{ border-bottom:none; }
 .list-table-row{ cursor:pointer; transition:background 0.1s ease; }
 .list-table-row:hover td{ background:var(--surface-2); }

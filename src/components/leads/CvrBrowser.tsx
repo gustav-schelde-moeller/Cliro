@@ -98,7 +98,22 @@ const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: "employees", label: "Medarbejdere (flest)" },
   { value: "brancheTekst", label: "Branche" },
   { value: "region", label: "Region" },
+  { value: "status", label: "Status" },
 ];
+
+// One-line recap of a row's secondary columns, shown in place of them when
+// the table is too narrow to lay them out side by side.
+function cvrRowSummary(c: CvrCompanyRow, showDistance: boolean): string {
+  return [
+    c.brancheLabel,
+    c.region,
+    c.employees != null ? `${c.employees} ${c.employees === 1 ? "ansat" : "ansatte"}` : null,
+    c.koebekraftScore != null ? `Købekraft ${c.koebekraftScore}` : null,
+    showDistance && c.distanceKm != null ? `${Math.round(c.distanceKm)} km` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 function useDebounced<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -527,18 +542,19 @@ export function CvrBrowser({
             ) : (
               rows.map((c) => (
                 <tr key={c.cvrNummer} className="list-table-row row-in" onClick={() => setSelected(c)}>
-                  <td onClick={(e) => e.stopPropagation()}>
+                  <td className="cvr-c-star" onClick={(e) => e.stopPropagation()}>
                     <button type="button" className={`star-btn${c.starred ? " starred" : ""}`} onClick={() => handleToggleStar(c)}>
                       {c.starred ? "★" : "☆"}
                     </button>
                   </td>
                   <td className="cell-primary">{c.navn || "Ukendt navn"}</td>
-                  <td>{c.brancheLabel ?? "—"}</td>
-                  <td>{c.region ?? "—"}</td>
-                  <td>{c.employees ?? "—"}</td>
-                  <td>{c.koebekraftScore ?? "—"}</td>
-                  {myLocation ? <td>{c.distanceKm != null ? `${Math.round(c.distanceKm)} km` : "—"}</td> : null}
-                  <td onClick={(e) => e.stopPropagation()}>
+                  <td className="cvr-c-summary">{cvrRowSummary(c, myLocation != null)}</td>
+                  <td className="cvr-c-meta">{c.brancheLabel ?? "—"}</td>
+                  <td className="cvr-c-meta">{c.region ?? "—"}</td>
+                  <td className="cvr-c-meta">{c.employees ?? "—"}</td>
+                  <td className="cvr-c-meta">{c.koebekraftScore ?? "—"}</td>
+                  {myLocation ? <td className="cvr-c-meta">{c.distanceKm != null ? `${Math.round(c.distanceKm)} km` : "—"}</td> : null}
+                  <td className="cvr-c-status" onClick={(e) => e.stopPropagation()}>
                     <div className="status-menu" onMouseEnter={cancelStatusClose} onMouseLeave={scheduleStatusClose}>
                       <button
                         type="button"
@@ -584,7 +600,7 @@ export function CvrBrowser({
                         : null}
                     </div>
                   </td>
-                  <td onClick={(e) => e.stopPropagation()}>
+                  <td className="cvr-c-lists" onClick={(e) => e.stopPropagation()}>
                     <ListMenu
                       companyName={c.navn || `CVR ${c.cvrNummer}`}
                       teamLists={teamLists}
