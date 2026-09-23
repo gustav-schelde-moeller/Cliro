@@ -19,6 +19,20 @@ async function requireMembership(teamId: string, userId: string) {
   return membership;
 }
 
+// A company someone else owns is theirs to move: only its assignee or an
+// admin may change its status, follow-up or assignment. Mirrored in the UI
+// by canEditPipeline (src/components/shared/ViewerContext.tsx).
+async function requireLeadEditable(teamId: string, companyId: number, userId: string, role: string) {
+  const existing = await prisma.lead.findUnique({
+    where: { teamId_companyId: { teamId, companyId } },
+    include: { assignee: { select: { name: true } } },
+  });
+  if (existing?.assigneeId && existing.assigneeId !== userId && role !== "admin") {
+    const owner = existing.assignee?.name ?? "en kollega";
+    throw new Error(`Virksomheden er tildelt ${owner} — kun ${owner} eller en admin kan ændre den.`);
+  }
+}
+
 const STATUS_LABELS: Record<string, string> = {
   new: "Ny",
   contacted: "Kontaktet",
@@ -34,11 +48,19 @@ function revalidateTeamPages() {
   revalidatePath("/pipeline");
 }
 
-export async function setLeadStatusAction(teamId: string, companyId: number, status: string) {
+// `claim: false` changes status without assigning the company — used when
+// an admin rearranges the pipeline board on the team's behalf.
+export async function setLeadStatusAction(
+  teamId: string,
+  companyId: number,
+  status: string,
+  options: { claim?: boolean } = {},
+) {
   const user = await requireUser();
-  await requireMembership(teamId, user.id);
+  const membership = await requireMembership(teamId, user.id);
   const company = await getCompanyById(companyId);
   if (!company) throw new Error("Ukendt virksomhed.");
+  await requireLeadEditable(teamId, companyId, user.id, membership.role);
 
   // A won or lost deal is closed, so its follow-up date shouldn't keep
   // nagging anyone.
@@ -53,7 +75,7 @@ export async function setLeadStatusAction(teamId: string, companyId: number, sta
   // already owns it. The `assigneeId: null` condition makes that check and
   // the claim one atomic write.
   const claimed =
-    status !== "new"
+    status !== "new" && options.claim !== false
       ? (await prisma.lead.updateMany({ where: { teamId, companyId, assigneeId: null }, data: { assigneeId: user.id } })).count > 0
       : false;
   const label = STATUS_LABELS[status] ?? status;
@@ -79,10 +101,11 @@ export async function setLeadStatusAction(teamId: string, companyId: number, sta
 
 export async function setLeadFollowUpAction(teamId: string, companyId: number, date: string | null) {
   const user = await requireUser();
-  await requireMembership(teamId, user.id);
+  const membership = await requireMembership(teamId, user.id);
   if (date !== null && !FOLLOW_UP_DATE_RE.test(date)) throw new Error("Ugyldig dato.");
   const company = await getCompanyById(companyId);
   if (!company) throw new Error("Ukendt virksomhed.");
+  await requireLeadEditable(teamId, companyId, user.id, membership.role);
 
   const followUpAt = date ? new Date(`${date}T00:00:00.000Z`) : null;
   const lead = await prisma.lead.upsert({
@@ -120,9 +143,10 @@ export async function setLeadFollowUpAction(teamId: string, companyId: number, d
 
 export async function assignToMeAction(teamId: string, companyId: number) {
   const user = await requireUser();
-  await requireMembership(teamId, user.id);
+  const membership = await requireMembership(teamId, user.id);
   const company = await getCompanyById(companyId);
   if (!company) throw new Error("Ukendt virksomhed.");
+  await requireLeadEditable(teamId, companyId, user.id, membership.role);
 
   await prisma.lead.upsert({
     where: { teamId_companyId: { teamId, companyId } },
@@ -143,9 +167,10 @@ export async function assignToMeAction(teamId: string, companyId: number) {
 
 export async function releaseAssignmentAction(teamId: string, companyId: number) {
   const user = await requireUser();
-  await requireMembership(teamId, user.id);
+  const membership = await requireMembership(teamId, user.id);
   const company = await getCompanyById(companyId);
   if (!company) throw new Error("Ukendt virksomhed.");
+  await requireLeadEditable(teamId, companyId, user.id, membership.role);
 
   await prisma.lead.upsert({
     where: { teamId_companyId: { teamId, companyId } },

@@ -44,11 +44,11 @@ export function useCvrRowMutations({
     setSelected((prev) => (prev && prev.cvrNummer === cvrNummer ? { ...prev, ...next } : prev));
   }
 
-  async function handleSetStatus(row: CvrCompanyRow, status: string) {
+  async function handleSetStatus(row: CvrCompanyRow, status: string, options: { claim?: boolean } = {}) {
     const prevPipeline = row.pipeline;
-    // Mirrors the server: a non-"Ny" status claims an unassigned company, and
-    // a won/lost deal drops its follow-up date.
-    const claim = status !== "new" && !prevPipeline?.assigneeId;
+    // Mirrors the server: a non-"Ny" status claims an unassigned company
+    // (unless the caller opts out), and a won/lost deal drops its follow-up.
+    const claim = status !== "new" && options.claim !== false && !prevPipeline?.assigneeId;
     const closed = status === "won" || status === "lost";
     patch(row.cvrNummer, {
       pipeline: {
@@ -59,7 +59,7 @@ export function useCvrRowMutations({
       },
     });
     try {
-      await setCvrLeadStatusAction(teamId, row.cvrNummer, status);
+      await setCvrLeadStatusAction(teamId, row.cvrNummer, status, options);
       if (closed && prevPipeline?.followUpAt) requestNotificationsRefresh();
     } catch (err) {
       patch(row.cvrNummer, { pipeline: prevPipeline });

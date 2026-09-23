@@ -60,11 +60,11 @@ export function useLeadMutations({
     }
   }
 
-  async function handleSetStatus(id: number, status: string) {
+  async function handleSetStatus(id: number, status: string, options: { claim?: boolean } = {}) {
     const prevLead = leadOf(id);
-    // Mirrors the server: a non-"Ny" status claims an unassigned company, and
-    // a won/lost deal drops its follow-up date.
-    const claim = status !== "new" && !prevLead.assigneeId;
+    // Mirrors the server: a non-"Ny" status claims an unassigned company
+    // (unless the caller opts out), and a won/lost deal drops its follow-up.
+    const claim = status !== "new" && options.claim !== false && !prevLead.assigneeId;
     const closed = status === "won" || status === "lost";
     setLeads((prev) => ({
       ...prev,
@@ -76,7 +76,7 @@ export function useLeadMutations({
       },
     }));
     try {
-      await setLeadStatusAction(teamId, id, status);
+      await setLeadStatusAction(teamId, id, status, options);
       if (closed && prevLead.followUpAt) requestNotificationsRefresh();
     } catch (err) {
       setLeads((prev) => ({ ...prev, [id]: prevLead }));

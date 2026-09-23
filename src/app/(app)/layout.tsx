@@ -7,6 +7,7 @@ import { ToastProvider } from "@/components/shared/ToastProvider";
 import { Sidebar } from "@/components/shared/Sidebar";
 import { Topbar } from "@/components/shared/Topbar";
 import { PageShell } from "@/components/shared/PageShell";
+import { ViewerProvider } from "@/components/shared/ViewerContext";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -32,23 +33,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <ToastProvider>
-      <div className="app-active" style={{ padding: 16, display: "flex", minHeight: "100vh" }}>
-        <div id="appShell" className="show" style={{ display: "grid" }}>
-          <Sidebar
-            teamName={team.name}
-            teamId={team.id}
-            userTeams={userTeams}
-            companyCount={companyCount}
-            isAdmin={ctx?.isAdmin ?? false}
-          />
-          <div className="main">
-            <Topbar name={user.name} avatarDataUrl={user.avatarDataUrl ?? user.image} />
-            <div className="pages">
-              <PageShell>{children}</PageShell>
+      <ViewerProvider viewer={{ userId: user.id, isAdmin: ctx?.isAdmin ?? false }}>
+        <div className="app-active" style={{ padding: 16, display: "flex", minHeight: "100vh" }}>
+          <div id="appShell" className="show" style={{ display: "grid" }}>
+            <Sidebar
+              teamName={team.name}
+              teamId={team.id}
+              userTeams={userTeams}
+              companyCount={companyCount}
+              isAdmin={ctx?.isAdmin ?? false}
+            />
+            <div className="main">
+              <Topbar name={user.name} avatarDataUrl={user.avatarDataUrl ?? user.image} />
+              <div className="pages">
+                <PageShell>{children}</PageShell>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </ViewerProvider>
     </ToastProvider>
   );
 }

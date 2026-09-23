@@ -8,6 +8,8 @@ import {
   getTeamLists,
   getCompanyListMemberships,
   getCvrCompanyRows,
+  getTeamWithRole,
+  getTeamMembers,
   type LeadState,
 } from "@/lib/queries";
 import { getCompanies } from "@/lib/companies";
@@ -27,14 +29,17 @@ export default async function PipelinePage({
 
   const { open } = await searchParams;
   const openKey = typeof open === "string" ? open : null;
+  const ctx = await getTeamWithRole(teamId, session.user.id);
+  if (!ctx) redirect("/team-gate");
 
-  const [companies, leadsMap, cvrLeadsMap, userStars, teamLists, listMembershipsMap] = await Promise.all([
+  const [companies, leadsMap, cvrLeadsMap, userStars, teamLists, listMembershipsMap, members] = await Promise.all([
     getCompanies(),
     getTeamLeadsMap(teamId),
     getTeamCvrLeadsMap(teamId),
     getUserStars(session.user.id),
     getTeamLists(teamId, session.user.id),
     getCompanyListMemberships(teamId, session.user.id),
+    getTeamMembers(teamId, ctx.team.ownerId),
   ]);
   const activeCvrNummers = [...cvrLeadsMap].filter(([, lead]) => isActive(lead)).map(([cvrNummer]) => cvrNummer);
   const cvrCompanies = await getCvrCompanyRows(teamId, session.user.id, activeCvrNummers);
@@ -56,9 +61,9 @@ export default async function PipelinePage({
       key={openKey ?? "board"}
       companies={activeCompanies}
       cvrCompanies={cvrCompanies}
+      members={members.map((m) => ({ userId: m.userId, name: m.name, avatarDataUrl: m.avatarDataUrl }))}
       teamId={teamId}
       myName={session.user.name ?? "Ukendt"}
-      myUserId={session.user.id}
       initialLeads={activeLeads}
       initialStars={[...userStars]}
       initialTeamLists={teamLists.map((l) => ({ id: l.id, name: l.name }))}

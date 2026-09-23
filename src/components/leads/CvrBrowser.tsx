@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
+import { canEditPipeline, useViewer } from "@/components/shared/ViewerContext";
 import { STATUS_DEFS, statusLabel } from "@/lib/status";
 import { CvrDrawer } from "./CvrDrawer";
 import { ListMenu, type TeamListOption } from "./ListMenu";
@@ -134,6 +135,7 @@ export function CvrBrowser({
   initialTeamLists: TeamListOption[];
 }) {
   const { showToast } = useToast();
+  const viewer = useViewer();
   const [search, setSearch] = useState("");
   const [branche, setBranche] = useState("");
   const [region, setRegion] = useState("");
@@ -561,6 +563,12 @@ export function CvrBrowser({
                         type="button"
                         className="status-pill"
                         data-status={c.pipeline?.status ?? "new"}
+                        disabled={!canEditPipeline(viewer, c.pipeline?.assigneeId ?? null)}
+                        title={
+                          canEditPipeline(viewer, c.pipeline?.assigneeId ?? null)
+                            ? undefined
+                            : `Tildelt ${c.pipeline?.assigneeName ?? "en kollega"} — kun de eller en admin kan ændre status`
+                        }
                         onClick={(e) => {
                           if (openStatusFor === c.cvrNummer) {
                             setOpenStatusFor(null);
@@ -571,7 +579,8 @@ export function CvrBrowser({
                           setOpenStatusFor(c.cvrNummer);
                         }}
                       >
-                        {statusLabel(c.pipeline?.status ?? "new")} ▾
+                        {statusLabel(c.pipeline?.status ?? "new")}
+                        {canEditPipeline(viewer, c.pipeline?.assigneeId ?? null) ? " ▾" : ""}
                       </button>
                       {openStatusFor === c.cvrNummer && statusMenuPos
                         ? createPortal(

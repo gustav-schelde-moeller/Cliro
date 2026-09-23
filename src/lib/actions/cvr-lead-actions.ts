@@ -39,10 +39,28 @@ async function requireCvrCompany(cvrNummer: string) {
   return company;
 }
 
-export async function setCvrLeadStatusAction(teamId: string, cvrNummer: string, status: string) {
+// Same owner-or-admin rule as requireLeadEditable in lead-actions.ts.
+async function requireCvrLeadEditable(teamId: string, cvrNummer: string, userId: string, role: string) {
+  const existing = await prisma.cvrTeamLead.findUnique({
+    where: { teamId_cvrNummer: { teamId, cvrNummer } },
+    include: { assignee: { select: { name: true } } },
+  });
+  if (existing?.assigneeId && existing.assigneeId !== userId && role !== "admin") {
+    const owner = existing.assignee?.name ?? "en kollega";
+    throw new Error(`Virksomheden er tildelt ${owner} — kun ${owner} eller en admin kan ændre den.`);
+  }
+}
+
+export async function setCvrLeadStatusAction(
+  teamId: string,
+  cvrNummer: string,
+  status: string,
+  options: { claim?: boolean } = {},
+) {
   const user = await requireUser();
-  await requireMembership(teamId, user.id);
+  const membership = await requireMembership(teamId, user.id);
   const company = await requireCvrCompany(cvrNummer);
+  await requireCvrLeadEditable(teamId, cvrNummer, user.id, membership.role);
 
   // Same closed-deal and claim-on-status-change rules as setLeadStatusAction.
   const closed = status === "won" || status === "lost";
@@ -52,7 +70,7 @@ export async function setCvrLeadStatusAction(teamId: string, cvrNummer: string, 
     create: { teamId, cvrNummer, status },
   });
   const claimed =
-    status !== "new"
+    status !== "new" && options.claim !== false
       ? (await prisma.cvrTeamLead.updateMany({ where: { teamId, cvrNummer, assigneeId: null }, data: { assigneeId: user.id } })).count > 0
       : false;
   const label = STATUS_LABELS[status] ?? status;
@@ -78,7 +96,8 @@ export async function setCvrLeadStatusAction(teamId: string, cvrNummer: string, 
 
 export async function setCvrFollowUpAction(teamId: string, cvrNummer: string, date: string | null) {
   const user = await requireUser();
-  await requireMembership(teamId, user.id);
+  const membership = await requireMembership(teamId, user.id);
+  await requireCvrLeadEditable(teamId, cvrNummer, user.id, membership.role);
   if (date !== null && !FOLLOW_UP_DATE_RE.test(date)) throw new Error("Ugyldig dato.");
   const company = await requireCvrCompany(cvrNummer);
 
@@ -117,8 +136,9 @@ export async function setCvrFollowUpAction(teamId: string, cvrNummer: string, da
 
 export async function assignCvrToMeAction(teamId: string, cvrNummer: string) {
   const user = await requireUser();
-  await requireMembership(teamId, user.id);
+  const membership = await requireMembership(teamId, user.id);
   const company = await requireCvrCompany(cvrNummer);
+  await requireCvrLeadEditable(teamId, cvrNummer, user.id, membership.role);
 
   await prisma.cvrTeamLead.upsert({
     where: { teamId_cvrNummer: { teamId, cvrNummer } },
@@ -139,8 +159,9 @@ export async function assignCvrToMeAction(teamId: string, cvrNummer: string) {
 
 export async function releaseCvrAssignmentAction(teamId: string, cvrNummer: string) {
   const user = await requireUser();
-  await requireMembership(teamId, user.id);
+  const membership = await requireMembership(teamId, user.id);
   const company = await requireCvrCompany(cvrNummer);
+  await requireCvrLeadEditable(teamId, cvrNummer, user.id, membership.role);
 
   await prisma.cvrTeamLead.upsert({
     where: { teamId_cvrNummer: { teamId, cvrNummer } },

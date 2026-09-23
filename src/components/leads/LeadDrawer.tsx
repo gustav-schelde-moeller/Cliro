@@ -7,8 +7,10 @@ import type { LeadState } from "./LeadCard";
 import { ListMenu, type TeamListOption } from "./ListMenu";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useBodyScrollLock } from "@/components/shared/useBodyScrollLock";
+import { canEditPipeline, useViewer } from "@/components/shared/ViewerContext";
 import { FollowUpControl } from "./FollowUpControl";
 import { MailComposeButtons } from "./MailComposeButtons";
+import { OwnerLockNote } from "./OwnerLockNote";
 
 function BdRow({ label, value, max, color, display }: { label: string; value: number; max: number; color: string; display?: string }) {
   const pct = Math.round((value / max) * 100);
@@ -57,6 +59,7 @@ export function LeadDrawer({
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const { showToast } = useToast();
   useBodyScrollLock();
+  const locked = !canEditPipeline(useViewer(), lead.assigneeId);
 
   async function copyText(text: string, label: string, btn: HTMLButtonElement) {
     try {
@@ -105,29 +108,35 @@ export function LeadDrawer({
         <div className="drawer-body">
           <div className="section-label">Pipeline</div>
           <div className="drawer-pipeline">
-            <div className="status-menu" style={statusMenuOpen ? { position: "relative" } : { position: "relative" }}>
-              <button type="button" className="status-pill" onClick={() => setStatusMenuOpen((v) => !v)}>
-                {statusLabel(lead.status)} ▾
-              </button>
-              {statusMenuOpen ? (
-                <div className="status-dropdown" style={{ display: "flex" }}>
-                  {STATUS_DEFS.map((s) => (
-                    <button
-                      key={s.key}
-                      type="button"
-                      className="status-opt"
-                      onClick={() => {
-                        setStatusMenuOpen(false);
-                        onSetStatus(s.key);
-                      }}
-                    >
-                      <span className={`status-dot ${s.key}`} />
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            {locked ? (
+              <span className="status-pill static" data-status={lead.status}>
+                {statusLabel(lead.status)}
+              </span>
+            ) : (
+              <div className="status-menu" style={{ position: "relative" }}>
+                <button type="button" className="status-pill" onClick={() => setStatusMenuOpen((v) => !v)}>
+                  {statusLabel(lead.status)} ▾
+                </button>
+                {statusMenuOpen ? (
+                  <div className="status-dropdown" style={{ display: "flex" }}>
+                    {STATUS_DEFS.map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        className="status-opt"
+                        onClick={() => {
+                          setStatusMenuOpen(false);
+                          onSetStatus(s.key);
+                        }}
+                      >
+                        <span className={`status-dot ${s.key}`} />
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
           <div className="drawer-assign">
             {lead.assigneeName ? (
@@ -145,9 +154,10 @@ export function LeadDrawer({
               </button>
             )}
           </div>
+          {locked && lead.assigneeName ? <OwnerLockNote ownerName={lead.assigneeName} /> : null}
 
           <div className="section-label">Opfølgning</div>
-          <FollowUpControl value={lead.followUpAt} onChange={onSetFollowUp} />
+          <FollowUpControl value={lead.followUpAt} onChange={onSetFollowUp} readOnly={locked} />
 
           <div className="section-label">Score-begrundelse</div>
           <div className="breakdown">
@@ -254,7 +264,7 @@ export function LeadDrawer({
               subject={company.mail.subject}
               body={company.mail.body}
               onOpen={() => {
-                if (lead.status === "new") onSetStatus("contacted");
+                if (!locked && lead.status === "new") onSetStatus("contacted");
               }}
             />
             <button
@@ -274,7 +284,7 @@ export function LeadDrawer({
               </button>
             ) : null}
           </div>
-          {lead.status === "new" ? (
+          {!locked && lead.status === "new" ? (
             <div className="distance-note" style={{ marginTop: 8 }}>
               Når du åbner mailen, sættes status til Kontaktet.
             </div>

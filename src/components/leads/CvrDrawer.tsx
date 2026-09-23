@@ -4,8 +4,10 @@ import { useState } from "react";
 import { STATUS_DEFS, statusLabel } from "@/lib/status";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useBodyScrollLock } from "@/components/shared/useBodyScrollLock";
+import { canEditPipeline, useViewer } from "@/components/shared/ViewerContext";
 import { FollowUpControl } from "./FollowUpControl";
 import { MailComposeButtons } from "./MailComposeButtons";
+import { OwnerLockNote } from "./OwnerLockNote";
 import { ListMenu, type TeamListOption } from "./ListMenu";
 import type { CvrCompanyRow } from "./CvrBrowser";
 
@@ -62,6 +64,7 @@ export function CvrDrawer({
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   useBodyScrollLock();
   const pipeline = company.pipeline ?? { status: "new", assigneeId: null, assigneeName: null, followUpAt: null };
+  const locked = !canEditPipeline(useViewer(), pipeline.assigneeId);
   const address = [company.vejnavn, company.husnummer].filter(Boolean).join(" ");
   const analysis = company.analysis;
 
@@ -120,29 +123,35 @@ export function CvrDrawer({
             Pipeline
           </div>
           <div className="drawer-pipeline">
-            <div className="status-menu">
-              <button type="button" className="status-pill" onClick={() => setStatusMenuOpen((v) => !v)}>
-                {statusLabel(pipeline.status)} ▾
-              </button>
-              {statusMenuOpen ? (
-                <div className="status-dropdown" style={{ display: "flex" }}>
-                  {STATUS_DEFS.map((s) => (
-                    <button
-                      key={s.key}
-                      type="button"
-                      className="status-opt"
-                      onClick={() => {
-                        setStatusMenuOpen(false);
-                        onSetStatus(s.key);
-                      }}
-                    >
-                      <span className={`status-dot ${s.key}`} />
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            {locked ? (
+              <span className="status-pill static" data-status={pipeline.status}>
+                {statusLabel(pipeline.status)}
+              </span>
+            ) : (
+              <div className="status-menu">
+                <button type="button" className="status-pill" onClick={() => setStatusMenuOpen((v) => !v)}>
+                  {statusLabel(pipeline.status)} ▾
+                </button>
+                {statusMenuOpen ? (
+                  <div className="status-dropdown" style={{ display: "flex" }}>
+                    {STATUS_DEFS.map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        className="status-opt"
+                        onClick={() => {
+                          setStatusMenuOpen(false);
+                          onSetStatus(s.key);
+                        }}
+                      >
+                        <span className={`status-dot ${s.key}`} />
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
           <div className="drawer-assign">
             {pipeline.assigneeName ? (
@@ -160,9 +169,10 @@ export function CvrDrawer({
               </button>
             )}
           </div>
+          {locked && pipeline.assigneeName ? <OwnerLockNote ownerName={pipeline.assigneeName} /> : null}
 
           <div className="section-label">Opfølgning</div>
-          <FollowUpControl value={pipeline.followUpAt} onChange={onSetFollowUp} />
+          <FollowUpControl value={pipeline.followUpAt} onChange={onSetFollowUp} readOnly={locked} />
 
           <div className="section-label">AI-analyse</div>
           {!analysis && !analyzing ? (
@@ -282,7 +292,7 @@ export function CvrDrawer({
                   subject={analysis.mail.subject}
                   body={analysis.mail.body}
                   onOpen={() => {
-                    if (pipeline.status === "new") onSetStatus("contacted");
+                    if (!locked && pipeline.status === "new") onSetStatus("contacted");
                   }}
                 />
                 <button
@@ -302,7 +312,7 @@ export function CvrDrawer({
                   </button>
                 ) : null}
               </div>
-              {pipeline.status === "new" ? (
+              {!locked && pipeline.status === "new" ? (
                 <div className="distance-note" style={{ marginTop: 8 }}>
                   Når du åbner mailen, sættes status til Kontaktet.
                 </div>

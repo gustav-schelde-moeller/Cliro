@@ -10,12 +10,32 @@ const QUICK_PICKS = [
   { label: "Om 2 uger", days: 14 },
 ];
 
-export function FollowUpControl({ value, onChange }: { value: string | null; onChange: (date: string | null) => void }) {
+export function FollowUpControl({
+  value,
+  onChange,
+  readOnly = false,
+}: {
+  value: string | null;
+  onChange: (date: string | null) => void;
+  readOnly?: boolean;
+}) {
   const [editing, setEditing] = useState(false);
 
   function pick(date: string) {
     onChange(date);
     setEditing(false);
+  }
+
+  if (readOnly) {
+    if (!value) return <div className="distance-note">Ingen opfølgning sat.</div>;
+    const rel = followUpRelative(value);
+    return (
+      <div className="followup">
+        <span className={`followup-chip ${rel.state}`}>
+          Følg op {formatFollowUpDate(value)} · {rel.label}
+        </span>
+      </div>
+    );
   }
 
   if (value && !editing) {
