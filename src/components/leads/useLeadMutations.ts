@@ -55,7 +55,12 @@ export function useLeadMutations({
 
   async function handleSetStatus(id: number, status: string) {
     const prevLead = leadOf(id);
-    setLeads((prev) => ({ ...prev, [id]: { ...prevLead, status } }));
+    // Mirrors the server: a non-"Ny" status claims an unassigned company.
+    const claim = status !== "new" && !prevLead.assigneeId;
+    setLeads((prev) => ({
+      ...prev,
+      [id]: { ...prevLead, status, ...(claim ? { assigneeId: "me", assigneeName: myName } : {}) },
+    }));
     try {
       await setLeadStatusAction(teamId, id, status);
     } catch (err) {

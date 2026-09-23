@@ -46,12 +46,17 @@ export async function setCvrLeadStatusAction(teamId: string, cvrNummer: string, 
     update: { status },
     create: { teamId, cvrNummer, status },
   });
+  // Same claim-on-status-change rule as setLeadStatusAction.
+  const claimed =
+    status !== "new"
+      ? (await prisma.cvrTeamLead.updateMany({ where: { teamId, cvrNummer, assigneeId: null }, data: { assigneeId: user.id } })).count > 0
+      : false;
   await prisma.activityLog.create({
     data: {
       teamId,
       userId: user.id,
       who: user.name ?? "Ukendt",
-      action: `satte status til "${STATUS_LABELS[status] ?? status}" for`,
+      action: `satte status til "${STATUS_LABELS[status] ?? status}"${claimed ? " og tildelte sig selv" : ""} for`,
       companyName: company.navn ?? `CVR ${cvrNummer}`,
     },
   });

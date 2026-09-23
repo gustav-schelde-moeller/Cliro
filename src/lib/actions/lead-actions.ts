@@ -42,12 +42,20 @@ export async function setLeadStatusAction(teamId: string, companyId: number, sta
     update: { status },
     create: { teamId, companyId, status },
   });
+  // Moving a company into the pipeline claims it for whoever did it, so it
+  // shows up under them on Team — but never takes it from someone who
+  // already owns it. The `assigneeId: null` condition makes that check and
+  // the claim one atomic write.
+  const claimed =
+    status !== "new"
+      ? (await prisma.lead.updateMany({ where: { teamId, companyId, assigneeId: null }, data: { assigneeId: user.id } })).count > 0
+      : false;
   await prisma.activityLog.create({
     data: {
       teamId,
       userId: user.id,
       who: user.name ?? "Ukendt",
-      action: `satte status til "${STATUS_LABELS[status] ?? status}" for`,
+      action: `satte status til "${STATUS_LABELS[status] ?? status}"${claimed ? " og tildelte sig selv" : ""} for`,
       companyName: company.name,
     },
   });

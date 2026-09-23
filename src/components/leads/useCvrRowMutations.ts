@@ -39,8 +39,14 @@ export function useCvrRowMutations({
 
   async function handleSetStatus(row: CvrCompanyRow, status: string) {
     const prevPipeline = row.pipeline;
+    // Mirrors the server: a non-"Ny" status claims an unassigned company.
+    const claim = status !== "new" && !prevPipeline?.assigneeId;
     patch(row.cvrNummer, {
-      pipeline: { status, assigneeId: prevPipeline?.assigneeId ?? null, assigneeName: prevPipeline?.assigneeName ?? null },
+      pipeline: {
+        status,
+        assigneeId: claim ? "me" : prevPipeline?.assigneeId ?? null,
+        assigneeName: claim ? myName : prevPipeline?.assigneeName ?? null,
+      },
     });
     try {
       await setCvrLeadStatusAction(teamId, row.cvrNummer, status);
