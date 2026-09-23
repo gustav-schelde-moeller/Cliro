@@ -85,7 +85,7 @@ export function TeamListDrawer({
         <div className="dash-empty">Ingen virksomheder i denne liste endnu.</div>
       ) : (
         <div className="list-table-wrap">
-          <table className="list-table">
+          <table className="list-table saved-list-table">
             <thead>
               <tr>
                 <th>Navn</th>

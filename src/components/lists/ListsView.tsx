@@ -20,6 +20,7 @@ import {
   toggleListTeamEditAction,
 } from "@/lib/actions/list-actions";
 import { ListActionsMenu } from "./ListActionsMenu";
+import { ListIcon } from "./ListIcon";
 
 type CvrListCompany = {
   cvrNummer: string;
@@ -220,14 +221,7 @@ export function ListsView({
         key={list.id}
       >
         <div className="list-card-head" onClick={() => toggleExpanded(list.id)}>
-          <div className="list-icon" aria-hidden>
-            <svg viewBox="0 0 24 24" fill="none" width={18} height={18}>
-              <path d="M9 6h11M9 12h11M9 18h11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="4.5" cy="6" r="1.4" fill="currentColor" />
-              <circle cx="4.5" cy="12" r="1.4" fill="currentColor" />
-              <circle cx="4.5" cy="18" r="1.4" fill="currentColor" />
-            </svg>
-          </div>
+          <ListIcon />
           <div className="list-card-main">
             <div className="list-card-title-row">
               <h3 className="list-card-title">{list.name}</h3>
@@ -258,7 +252,7 @@ export function ListsView({
             ) : null}
             {list.companies.length > 0 || list.cvrCompanies.length > 0 ? (
               <div className="list-table-wrap">
-                <table className="list-table">
+                <table className="list-table saved-list-table">
                   <thead>
                     <tr>
                       <th>Navn</th>

@@ -17,6 +17,7 @@ import { useCvrRowMutations } from "@/components/leads/useCvrRowMutations";
 import type { CvrCompanyRow } from "@/components/leads/CvrBrowser";
 import type { TeamListOption } from "@/components/leads/ListMenu";
 import { TeamListDrawer, type TeamListPreview } from "./TeamListDrawer";
+import { ListIcon } from "@/components/lists/ListIcon";
 
 type MemberLead = { id: number; name: string; industry: string; status: string };
 type MemberCvrLead = { cvrNummer: string; name: string; industry: string; status: string };
@@ -390,30 +391,37 @@ export function TeamView({
         {publicLists.length === 0 ? (
           <div className="dash-empty">Ingen synlige lister endnu. Opret en på Lister-siden og gør den synlig for teamet.</div>
         ) : (
-          publicLists.map((l, i) => {
-            const itemCount = l.companies.length + l.cvrCompanies.length;
-            return (
-              <div
-                className="panel-card list-card-anim"
-                style={{ marginTop: i === 0 ? 0 : 10, animationDelay: `${Math.min(i, 8) * 40}ms`, cursor: "pointer" }}
-                onClick={() => setSelectedListId(l.id)}
-                key={l.id}
-              >
-                <div className="list-header-row">
-                  <div className="list-header-title">
-                    <h3 className="list-name-link">{l.name}</h3>
-                    <span className="tag">
-                      {itemCount} {itemCount === 1 ? "virksomhed" : "virksomheder"}
-                    </span>
+          <div className="list">
+            {publicLists.map((l, i) => {
+              const itemCount = l.companies.length + l.cvrCompanies.length;
+              const meta = [
+                `${itemCount} ${itemCount === 1 ? "virksomhed" : "virksomheder"}`,
+                l.createdByName ? `Oprettet af ${l.createdByName}` : null,
+                formatDate(l.createdAt),
+              ].filter(Boolean);
+              return (
+                <div
+                  className={`panel-card list-card list-card-anim${l.isMine ? " mine" : ""}`}
+                  style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+                  onClick={() => setSelectedListId(l.id)}
+                  key={l.id}
+                >
+                  <div className="list-card-head">
+                    <ListIcon />
+                    <div className="list-card-main">
+                      <div className="list-card-title-row">
+                        <h3 className="list-card-title">{l.name}</h3>
+                      </div>
+                      <div className="list-card-meta">{meta.join(" · ")}</div>
+                    </div>
+                    <svg className="list-chevron" viewBox="0 0 24 24" fill="none" width={16} height={16}>
+                      <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </div>
                 </div>
-                <div className="distance-note list-created-note">
-                  {l.createdByName ? `Oprettet af ${l.createdByName} · ` : ""}
-                  {formatDate(l.createdAt)}
-                </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
 

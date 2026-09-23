@@ -491,7 +491,7 @@ export function CvrBrowser({
       ) : null}
 
       <div className="list-table-wrap">
-        <table className="list-table">
+        <table className="list-table cvr-table">
           <thead>
             <tr>
               <th />
