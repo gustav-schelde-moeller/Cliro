@@ -5,6 +5,7 @@ import { buildWhere, SORT_WHITELIST, STATUS_SORT_KEY, statusRank } from "@/lib/c
 import { brancheDisplayGroup } from "@/lib/cvr/branche";
 import { haversineKm } from "@/lib/companies";
 import { mapCvrAnalysis } from "@/lib/queries";
+import { toFollowUpIso } from "@/lib/followup";
 import type { Prisma } from "@prisma/client";
 
 const INCLUDE = (teamId: string, userId: string) =>
@@ -46,7 +47,12 @@ function enrich(row: Row, lat: number | null, lng: number | null) {
     regnskabAar: row.regnskabAar,
     koebekraftScore: row.koebekraftScore,
     pipeline: teamLead
-      ? { status: teamLead.status, assigneeId: teamLead.assigneeId, assigneeName: teamLead.assignee?.name ?? null }
+      ? {
+          status: teamLead.status,
+          assigneeId: teamLead.assigneeId,
+          assigneeName: teamLead.assignee?.name ?? null,
+          followUpAt: toFollowUpIso(teamLead.followUpAt),
+        }
       : null,
     starred: row.stars.length > 0,
     listIds: row.listItems.map((i) => i.listId),

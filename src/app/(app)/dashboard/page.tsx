@@ -9,6 +9,7 @@ import {
   getTeamLists,
   getCompanyListMemberships,
   getCvrCompanyRows,
+  type LeadState,
 } from "@/lib/queries";
 import { getCompanies, displayScore, displayTier } from "@/lib/companies";
 import { STATUS_DEFS } from "@/lib/status";
@@ -64,7 +65,7 @@ export default async function DashboardPage() {
     const lead = leadsMap.get(c.id);
     return lead && (lead.status !== "new" || lead.assigneeId);
   });
-  const activeLeads: Record<number, { status: string; assigneeId: string | null; assigneeName: string | null }> = {};
+  const activeLeads: Record<number, LeadState> = {};
   for (const c of activeCompanies) activeLeads[c.id] = leadsMap.get(c.id)!;
 
   const activeCvrCompanies = cvrCompanies.filter((c) => c.pipeline && (c.pipeline.status !== "new" || c.pipeline.assigneeId));

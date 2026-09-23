@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { genTeamCode } from "@/lib/team-code";
 import { setActiveTeamId, clearActiveTeamId } from "@/lib/session-team";
 import { sendEmail, inviteEmail } from "@/lib/email";
+import { notifyTeam } from "@/lib/notifications";
 
 export type ActionResult = { error?: string; ok?: boolean };
 
@@ -71,6 +72,7 @@ export async function joinTeamAction(_prev: ActionResult, formData: FormData): P
     await prisma.activityLog.create({
       data: { teamId: team.id, userId: user.id, who: user.name ?? "Ukendt", action: "tilsluttede sig teamet" },
     });
+    await notifyTeam({ teamId: team.id, actorId: user.id, actorName: user.name ?? "Ukendt", text: "tilsluttede sig teamet", href: "/team" });
   }
 
   await setActiveTeamId(team.id);

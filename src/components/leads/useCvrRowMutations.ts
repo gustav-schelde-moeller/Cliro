@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
-import { setCvrLeadStatusAction, assignCvrToMeAction, releaseCvrAssignmentAction, toggleCvrStarAction } from "@/lib/actions/cvr-lead-actions";
+import {
+  setCvrLeadStatusAction,
+  setCvrFollowUpAction,
+  assignCvrToMeAction,
+  releaseCvrAssignmentAction,
+  toggleCvrStarAction,
+} from "@/lib/actions/cvr-lead-actions";
+import { requestNotificationsRefresh } from "@/components/shared/notificationEvents";
 import { toggleCvrCompanyInListAction, createCvrListAndAddAction } from "@/lib/actions/list-actions";
 import type { TeamListOption } from "./ListMenu";
 import type { CvrCompanyRow } from "./CvrBrowser";
@@ -39,26 +46,52 @@ export function useCvrRowMutations({
 
   async function handleSetStatus(row: CvrCompanyRow, status: string) {
     const prevPipeline = row.pipeline;
-    // Mirrors the server: a non-"Ny" status claims an unassigned company.
+    // Mirrors the server: a non-"Ny" status claims an unassigned company, and
+    // a won/lost deal drops its follow-up date.
     const claim = status !== "new" && !prevPipeline?.assigneeId;
+    const closed = status === "won" || status === "lost";
     patch(row.cvrNummer, {
       pipeline: {
         status,
         assigneeId: claim ? "me" : prevPipeline?.assigneeId ?? null,
         assigneeName: claim ? myName : prevPipeline?.assigneeName ?? null,
+        followUpAt: closed ? null : prevPipeline?.followUpAt ?? null,
       },
     });
     try {
       await setCvrLeadStatusAction(teamId, row.cvrNummer, status);
+      if (closed && prevPipeline?.followUpAt) requestNotificationsRefresh();
     } catch (err) {
       patch(row.cvrNummer, { pipeline: prevPipeline });
       showToast(errorMessage(err, "Kunne ikke opdatere status."));
     }
   }
 
+  async function handleSetFollowUp(row: CvrCompanyRow, date: string | null) {
+    const prevPipeline = row.pipeline;
+    const claim = date !== null && !prevPipeline?.assigneeId;
+    patch(row.cvrNummer, {
+      pipeline: {
+        status: prevPipeline?.status ?? "new",
+        assigneeId: claim ? "me" : prevPipeline?.assigneeId ?? null,
+        assigneeName: claim ? myName : prevPipeline?.assigneeName ?? null,
+        followUpAt: date,
+      },
+    });
+    try {
+      await setCvrFollowUpAction(teamId, row.cvrNummer, date);
+      requestNotificationsRefresh();
+    } catch (err) {
+      patch(row.cvrNummer, { pipeline: prevPipeline });
+      showToast(errorMessage(err, "Kunne ikke gemme opfølgningen."));
+    }
+  }
+
   async function handleAssign(row: CvrCompanyRow) {
     const prevPipeline = row.pipeline;
-    patch(row.cvrNummer, { pipeline: { status: prevPipeline?.status ?? "new", assigneeId: "me", assigneeName: myName } });
+    patch(row.cvrNummer, {
+      pipeline: { status: prevPipeline?.status ?? "new", assigneeId: "me", assigneeName: myName, followUpAt: prevPipeline?.followUpAt ?? null },
+    });
     try {
       await assignCvrToMeAction(teamId, row.cvrNummer);
     } catch (err) {
@@ -132,6 +165,7 @@ export function useCvrRowMutations({
     teamLists,
     analyzingFor,
     handleSetStatus,
+    handleSetFollowUp,
     handleAssign,
     handleRelease,
     handleToggleStar,

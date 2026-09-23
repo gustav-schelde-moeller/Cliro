@@ -54,6 +54,7 @@ export function VirksomhederView({
     leadOf,
     handleToggleStar,
     handleSetStatus,
+    handleSetFollowUp,
     handleAssign,
     handleRelease,
     handleToggleList,
@@ -381,6 +382,7 @@ export function VirksomhederView({
           onClose={() => setSelectedId(null)}
           onToggleStar={() => handleToggleStar(selectedCompany.id)}
           onSetStatus={(status) => handleSetStatus(selectedCompany.id, status)}
+          onSetFollowUp={(date) => handleSetFollowUp(selectedCompany.id, date)}
           onAssign={() => handleAssign(selectedCompany.id)}
           onRelease={() => handleRelease(selectedCompany.id)}
           onToggleList={(listId) => handleToggleList(selectedCompany.id, listId)}

@@ -7,6 +7,8 @@ import type { LeadState } from "./LeadCard";
 import { ListMenu, type TeamListOption } from "./ListMenu";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useBodyScrollLock } from "@/components/shared/useBodyScrollLock";
+import { FollowUpControl } from "./FollowUpControl";
+import { MailComposeButtons } from "./MailComposeButtons";
 
 function BdRow({ label, value, max, color, display }: { label: string; value: number; max: number; color: string; display?: string }) {
   const pct = Math.round((value / max) * 100);
@@ -31,6 +33,7 @@ export function LeadDrawer({
   onClose,
   onToggleStar,
   onSetStatus,
+  onSetFollowUp,
   onAssign,
   onRelease,
   onToggleList,
@@ -45,6 +48,7 @@ export function LeadDrawer({
   onClose: () => void;
   onToggleStar: () => void;
   onSetStatus: (status: string) => void;
+  onSetFollowUp: (date: string | null) => void;
   onAssign: () => void;
   onRelease: () => void;
   onToggleList: (listId: string) => void;
@@ -141,6 +145,9 @@ export function LeadDrawer({
               </button>
             )}
           </div>
+
+          <div className="section-label">Opfølgning</div>
+          <FollowUpControl value={lead.followUpAt} onChange={onSetFollowUp} />
 
           <div className="section-label">Score-begrundelse</div>
           <div className="breakdown">
@@ -242,9 +249,17 @@ export function LeadDrawer({
             <div className="mail-body">{company.mail.body}</div>
           </div>
           <div className="mail-actions">
+            <MailComposeButtons
+              to={company.contact.email ?? null}
+              subject={company.mail.subject}
+              body={company.mail.body}
+              onOpen={() => {
+                if (lead.status === "new") onSetStatus("contacted");
+              }}
+            />
             <button
               type="button"
-              className="btn primary"
+              className="btn"
               onClick={(e) => copyText(`Emne: ${company.mail.subject}\n\n${company.mail.body}`, "Kopieret ✓", e.currentTarget)}
             >
               <svg viewBox="0 0 24 24" fill="none">
@@ -259,6 +274,11 @@ export function LeadDrawer({
               </button>
             ) : null}
           </div>
+          {lead.status === "new" ? (
+            <div className="distance-note" style={{ marginTop: 8 }}>
+              Når du åbner mailen, sættes status til Kontaktet.
+            </div>
+          ) : null}
         </div>
       </div>
     </>

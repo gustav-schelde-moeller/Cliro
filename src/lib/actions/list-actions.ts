@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCompanyById } from "@/lib/companies";
+import { notifyTeam } from "@/lib/notifications";
 
 async function requireUser() {
   const session = await auth();
@@ -55,6 +56,8 @@ export async function createListAction(teamId: string, name: string): Promise<{ 
   await prisma.activityLog.create({
     data: { teamId, userId: user.id, who: user.name ?? "Ukendt", action: `oprettede listen "${trimmed}"` },
   });
+  // New lists start visible to the whole team, so they're news to everyone.
+  await notifyTeam({ teamId, actorId: user.id, actorName: user.name ?? "Ukendt", text: `oprettede listen "${trimmed}"`, href: "/lister" });
   revalidateListPages();
   return { id: list.id, name: list.name };
 }
@@ -141,6 +144,9 @@ export async function toggleListVisibilityAction(teamId: string, listId: string)
       action: updated.isPrivate ? `gjorde listen "${list.name}" privat` : `gjorde listen "${list.name}" synlig for teamet`,
     },
   });
+  if (!updated.isPrivate) {
+    await notifyTeam({ teamId, actorId: user.id, actorName: user.name ?? "Ukendt", text: `delte listen "${list.name}" med teamet`, href: "/lister" });
+  }
   revalidateListPages();
   return { isPrivate: updated.isPrivate };
 }

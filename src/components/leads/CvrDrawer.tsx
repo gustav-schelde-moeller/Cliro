@@ -4,6 +4,8 @@ import { useState } from "react";
 import { STATUS_DEFS, statusLabel } from "@/lib/status";
 import { useToast } from "@/components/shared/ToastProvider";
 import { useBodyScrollLock } from "@/components/shared/useBodyScrollLock";
+import { FollowUpControl } from "./FollowUpControl";
+import { MailComposeButtons } from "./MailComposeButtons";
 import { ListMenu, type TeamListOption } from "./ListMenu";
 import type { CvrCompanyRow } from "./CvrBrowser";
 
@@ -35,6 +37,7 @@ export function CvrDrawer({
   onClose,
   onToggleStar,
   onSetStatus,
+  onSetFollowUp,
   onAssign,
   onRelease,
   onToggleList,
@@ -48,6 +51,7 @@ export function CvrDrawer({
   onClose: () => void;
   onToggleStar: () => void;
   onSetStatus: (status: string) => void;
+  onSetFollowUp: (date: string | null) => void;
   onAssign: () => void;
   onRelease: () => void;
   onToggleList: (listId: string) => void;
@@ -57,7 +61,7 @@ export function CvrDrawer({
   const { showToast } = useToast();
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   useBodyScrollLock();
-  const pipeline = company.pipeline ?? { status: "new", assigneeId: null, assigneeName: null };
+  const pipeline = company.pipeline ?? { status: "new", assigneeId: null, assigneeName: null, followUpAt: null };
   const address = [company.vejnavn, company.husnummer].filter(Boolean).join(" ");
   const analysis = company.analysis;
 
@@ -156,6 +160,9 @@ export function CvrDrawer({
               </button>
             )}
           </div>
+
+          <div className="section-label">Opfølgning</div>
+          <FollowUpControl value={pipeline.followUpAt} onChange={onSetFollowUp} />
 
           <div className="section-label">AI-analyse</div>
           {!analysis && !analyzing ? (
@@ -270,9 +277,17 @@ export function CvrDrawer({
                 <div className="mail-body">{analysis.mail.body}</div>
               </div>
               <div className="mail-actions">
+                <MailComposeButtons
+                  to={analysis.contact.email ?? company.email ?? null}
+                  subject={analysis.mail.subject}
+                  body={analysis.mail.body}
+                  onOpen={() => {
+                    if (pipeline.status === "new") onSetStatus("contacted");
+                  }}
+                />
                 <button
                   type="button"
-                  className="btn primary"
+                  className="btn"
                   onClick={(e) => copyText(`Emne: ${analysis.mail.subject}\n\n${analysis.mail.body}`, "Kopieret ✓", e.currentTarget)}
                 >
                   <svg viewBox="0 0 24 24" fill="none">
@@ -287,6 +302,11 @@ export function CvrDrawer({
                   </button>
                 ) : null}
               </div>
+              {pipeline.status === "new" ? (
+                <div className="distance-note" style={{ marginTop: 8 }}>
+                  Når du åbner mailen, sættes status til Kontaktet.
+                </div>
+              ) : null}
               <div className="distance-note" style={{ marginTop: 10 }}>
                 Analyseret {new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "short", year: "numeric" }).format(new Date(analysis.analyzedAt))}
               </div>

@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import { useToast, errorMessage } from "@/components/shared/ToastProvider";
-import { setLeadStatusAction, assignToMeAction, releaseAssignmentAction, toggleStarAction } from "@/lib/actions/lead-actions";
+import {
+  setLeadStatusAction,
+  setLeadFollowUpAction,
+  assignToMeAction,
+  releaseAssignmentAction,
+  toggleStarAction,
+} from "@/lib/actions/lead-actions";
+import { requestNotificationsRefresh } from "@/components/shared/notificationEvents";
 import { toggleCompanyInListAction, createListAndAddAction } from "@/lib/actions/list-actions";
 import type { LeadState } from "./LeadCard";
 import type { TeamListOption } from "./ListMenu";
@@ -29,7 +36,7 @@ export function useLeadMutations({
   const [teamLists, setTeamLists] = useState<TeamListOption[]>(initialTeamLists);
   const [listMemberships, setListMemberships] = useState<Record<number, string[]>>(initialListMemberships);
 
-  const leadOf = (id: number): LeadState => leads[id] ?? { status: "new", assigneeId: null, assigneeName: null };
+  const leadOf = (id: number): LeadState => leads[id] ?? { status: "new", assigneeId: null, assigneeName: null, followUpAt: null };
   const listIdsOf = (id: number): Set<string> => new Set(listMemberships[id] ?? []);
 
   async function handleToggleStar(id: number) {
@@ -55,17 +62,41 @@ export function useLeadMutations({
 
   async function handleSetStatus(id: number, status: string) {
     const prevLead = leadOf(id);
-    // Mirrors the server: a non-"Ny" status claims an unassigned company.
+    // Mirrors the server: a non-"Ny" status claims an unassigned company, and
+    // a won/lost deal drops its follow-up date.
     const claim = status !== "new" && !prevLead.assigneeId;
+    const closed = status === "won" || status === "lost";
     setLeads((prev) => ({
       ...prev,
-      [id]: { ...prevLead, status, ...(claim ? { assigneeId: "me", assigneeName: myName } : {}) },
+      [id]: {
+        ...prevLead,
+        status,
+        ...(claim ? { assigneeId: "me", assigneeName: myName } : {}),
+        ...(closed ? { followUpAt: null } : {}),
+      },
     }));
     try {
       await setLeadStatusAction(teamId, id, status);
+      if (closed && prevLead.followUpAt) requestNotificationsRefresh();
     } catch (err) {
       setLeads((prev) => ({ ...prev, [id]: prevLead }));
       showToast(errorMessage(err, "Kunne ikke opdatere status."));
+    }
+  }
+
+  async function handleSetFollowUp(id: number, date: string | null) {
+    const prevLead = leadOf(id);
+    const claim = date !== null && !prevLead.assigneeId;
+    setLeads((prev) => ({
+      ...prev,
+      [id]: { ...prevLead, followUpAt: date, ...(claim ? { assigneeId: "me", assigneeName: myName } : {}) },
+    }));
+    try {
+      await setLeadFollowUpAction(teamId, id, date);
+      requestNotificationsRefresh();
+    } catch (err) {
+      setLeads((prev) => ({ ...prev, [id]: prevLead }));
+      showToast(errorMessage(err, "Kunne ikke gemme opfølgningen."));
     }
   }
 
@@ -122,6 +153,7 @@ export function useLeadMutations({
     listIdsOf,
     handleToggleStar,
     handleSetStatus,
+    handleSetFollowUp,
     handleAssign,
     handleRelease,
     handleToggleList,

@@ -29,6 +29,7 @@ model User {
   resetTokens      PasswordResetToken[]
   cvrLeadsAssigned CvrTeamLead[]        @relation("CvrLeadAssignee")
   cvrStars         CvrStar[]
+  notifications    Notification[]       @relation("NotificationRecipient")
 }
 
 // Standard Auth.js (NextAuth) models — required by the Prisma adapter so
@@ -80,8 +81,9 @@ model Team {
   members      TeamMember[]
   leads        Lead[]
   activity     ActivityLog[]
-  lists        CompanyList[]
-  cvrTeamLeads CvrTeamLead[]
+  lists         CompanyList[]
+  cvrTeamLeads  CvrTeamLead[]
+  notifications Notification[]
 }
 
 model TeamMember {
@@ -131,6 +133,8 @@ model Lead {
   companyId  Int
   status     String   @default("new") // new | contacted | meeting | won | lost
   assigneeId String?
+  // Calendar date (stored as UTC midnight) the assignee should follow up.
+  followUpAt DateTime?
   updatedAt  DateTime @updatedAt
 
   team     Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -284,6 +288,7 @@ model CvrTeamLead {
   cvrNummer  String
   status     String   @default("new")
   assigneeId String?
+  followUpAt DateTime?
   updatedAt  DateTime @updatedAt
 
   team     Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -292,6 +297,28 @@ model CvrTeamLead {
 
   @@unique([teamId, cvrNummer])
   @@map("cvr_team_leads")
+}
+
+// The few team events worth interrupting someone for — a colleague booking a
+// meeting or winning a deal, someone changing a company you own, a newly
+// shared list, a new member. One row per recipient (fanned out on write), so
+// "unread" and "what concerns me" are plain queries instead of re-deriving
+// them from ActivityLog's free-text lines.
+model Notification {
+  id          String    @id @default(cuid())
+  teamId      String
+  recipientId String
+  actorName   String
+  text        String
+  companyName String?
+  href        String?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  team      Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  recipient User @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, teamId, createdAt])
 }
 
 // Per-user bookmark for CVR companies — the CVR-registry equivalent of Star.

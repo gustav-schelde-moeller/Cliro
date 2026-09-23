@@ -2,6 +2,7 @@ import type { CvrAnalysis } from "@prisma/client";
 import { prisma } from "./prisma";
 import { getCompanies, type Company } from "./companies";
 import { brancheDisplayGroup } from "./cvr/branche";
+import { toFollowUpIso } from "./followup";
 import type { CvrCompanyRow, CvrAnalysisData } from "@/components/leads/CvrBrowser";
 
 // Prisma's Json columns type as the broad `JsonValue` union — cast to the
@@ -66,7 +67,7 @@ export async function getTeamMembers(teamId: string, ownerId: string): Promise<T
   }));
 }
 
-export type LeadState = { status: string; assigneeId: string | null; assigneeName: string | null };
+export type LeadState = { status: string; assigneeId: string | null; assigneeName: string | null; followUpAt: string | null };
 
 export async function getTeamLeadsMap(teamId: string): Promise<Map<number, LeadState>> {
   const leads = await prisma.lead.findMany({
@@ -79,6 +80,7 @@ export async function getTeamLeadsMap(teamId: string): Promise<Map<number, LeadS
       status: lead.status,
       assigneeId: lead.assigneeId,
       assigneeName: lead.assignee?.name ?? null,
+      followUpAt: toFollowUpIso(lead.followUpAt),
     });
   }
   return map;
@@ -103,6 +105,7 @@ export async function getTeamCvrLeadsMap(teamId: string): Promise<Map<string, Le
       status: lead.status,
       assigneeId: lead.assigneeId,
       assigneeName: lead.assignee?.name ?? null,
+      followUpAt: toFollowUpIso(lead.followUpAt),
     });
   }
   return map;
@@ -156,7 +159,12 @@ export async function getCvrCompanyRows(teamId: string, userId: string, cvrNumme
       regnskabAar: row.regnskabAar,
       koebekraftScore: row.koebekraftScore,
       pipeline: teamLead
-        ? { status: teamLead.status, assigneeId: teamLead.assigneeId, assigneeName: teamLead.assignee?.name ?? null }
+        ? {
+            status: teamLead.status,
+            assigneeId: teamLead.assigneeId,
+            assigneeName: teamLead.assignee?.name ?? null,
+            followUpAt: toFollowUpIso(teamLead.followUpAt),
+          }
         : null,
       starred: row.stars.length > 0,
       listIds: row.listItems.map((i) => i.listId),

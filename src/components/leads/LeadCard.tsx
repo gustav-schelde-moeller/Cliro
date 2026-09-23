@@ -4,7 +4,7 @@ import { displayScore, displayTier, type Company } from "@/lib/companies";
 import { statusLabel } from "@/lib/status";
 import { ListMenu, type TeamListOption } from "./ListMenu";
 
-export type LeadState = { status: string; assigneeId: string | null; assigneeName: string | null };
+export type LeadState = { status: string; assigneeId: string | null; assigneeName: string | null; followUpAt: string | null };
 export type { TeamListOption };
 
 export function LeadCard({

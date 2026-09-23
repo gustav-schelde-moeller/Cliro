@@ -34,7 +34,7 @@ function SortArrow({ pointingDown }: { pointingDown: boolean }) {
   );
 }
 
-export type CvrPipelineState = { status: string; assigneeId: string | null; assigneeName: string | null };
+export type CvrPipelineState = { status: string; assigneeId: string | null; assigneeName: string | null; followUpAt: string | null };
 
 export type CvrAnalysisData = {
   score: number;
@@ -179,6 +179,7 @@ export function CvrBrowser({
     teamLists,
     analyzingFor,
     handleSetStatus,
+    handleSetFollowUp,
     handleAssign,
     handleRelease,
     handleToggleStar,
@@ -634,6 +635,7 @@ export function CvrBrowser({
           onClose={() => setSelected(null)}
           onToggleStar={() => handleToggleStar(selected)}
           onSetStatus={(status) => handleSetStatus(selected, status)}
+          onSetFollowUp={(date) => handleSetFollowUp(selected, date)}
           onAssign={() => handleAssign(selected)}
           onRelease={() => handleRelease(selected)}
           onToggleList={(listId) => handleToggleList(selected, listId)}

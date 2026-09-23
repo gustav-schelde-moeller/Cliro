@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCompanyById } from "@/lib/companies";
+import { FOLLOW_UP_DATE_RE, formatFollowUpDate } from "@/lib/followup";
+import { notifyTeam, notifyUser, pipelineHref } from "@/lib/notifications";
 
 async function requireUser() {
   const session = await auth();
@@ -29,6 +31,7 @@ function revalidateTeamPages() {
   revalidatePath("/virksomheder");
   revalidatePath("/dashboard");
   revalidatePath("/team");
+  revalidatePath("/pipeline");
 }
 
 export async function setLeadStatusAction(teamId: string, companyId: number, status: string) {
@@ -37,9 +40,12 @@ export async function setLeadStatusAction(teamId: string, companyId: number, sta
   const company = await getCompanyById(companyId);
   if (!company) throw new Error("Ukendt virksomhed.");
 
-  await prisma.lead.upsert({
+  // A won or lost deal is closed, so its follow-up date shouldn't keep
+  // nagging anyone.
+  const closed = status === "won" || status === "lost";
+  const lead = await prisma.lead.upsert({
     where: { teamId_companyId: { teamId, companyId } },
-    update: { status },
+    update: { status, ...(closed ? { followUpAt: null } : {}) },
     create: { teamId, companyId, status },
   });
   // Moving a company into the pipeline claims it for whoever did it, so it
@@ -50,15 +56,65 @@ export async function setLeadStatusAction(teamId: string, companyId: number, sta
     status !== "new"
       ? (await prisma.lead.updateMany({ where: { teamId, companyId, assigneeId: null }, data: { assigneeId: user.id } })).count > 0
       : false;
+  const label = STATUS_LABELS[status] ?? status;
+  const actorName = user.name ?? "Ukendt";
   await prisma.activityLog.create({
     data: {
       teamId,
       userId: user.id,
-      who: user.name ?? "Ukendt",
-      action: `satte status til "${STATUS_LABELS[status] ?? status}"${claimed ? " og tildelte sig selv" : ""} for`,
+      who: actorName,
+      action: `satte status til "${label}"${claimed ? " og tildelte sig selv" : ""} for`,
       companyName: company.name,
     },
   });
+  const notification = { teamId, actorId: user.id, actorName, companyName: company.name, href: pipelineHref("lead", companyId) };
+  if (status === "meeting" || status === "won") {
+    await notifyTeam({ ...notification, text: status === "won" ? "vandt" : "bookede et møde med" });
+  } else {
+    // `lead.assigneeId` is the owner from before any claim above.
+    await notifyUser(lead.assigneeId, { ...notification, text: `satte status til "${label}" på din virksomhed` });
+  }
+  revalidateTeamPages();
+}
+
+export async function setLeadFollowUpAction(teamId: string, companyId: number, date: string | null) {
+  const user = await requireUser();
+  await requireMembership(teamId, user.id);
+  if (date !== null && !FOLLOW_UP_DATE_RE.test(date)) throw new Error("Ugyldig dato.");
+  const company = await getCompanyById(companyId);
+  if (!company) throw new Error("Ukendt virksomhed.");
+
+  const followUpAt = date ? new Date(`${date}T00:00:00.000Z`) : null;
+  const lead = await prisma.lead.upsert({
+    where: { teamId_companyId: { teamId, companyId } },
+    update: { followUpAt },
+    create: { teamId, companyId, followUpAt },
+  });
+  // Same claim rule as a status change: planning a follow-up means you're
+  // working this company, unless someone already owns it.
+  const claimed = date
+    ? (await prisma.lead.updateMany({ where: { teamId, companyId, assigneeId: null }, data: { assigneeId: user.id } })).count > 0
+    : false;
+  const actorName = user.name ?? "Ukendt";
+  await prisma.activityLog.create({
+    data: {
+      teamId,
+      userId: user.id,
+      who: actorName,
+      action: date ? `satte opfølgning til ${formatFollowUpDate(date)}${claimed ? " og tildelte sig selv" : ""} for` : "fjernede opfølgningen for",
+      companyName: company.name,
+    },
+  });
+  if (date) {
+    await notifyUser(lead.assigneeId, {
+      teamId,
+      actorId: user.id,
+      actorName,
+      text: `satte opfølgning til ${formatFollowUpDate(date)} på din virksomhed`,
+      companyName: company.name,
+      href: pipelineHref("lead", companyId),
+    });
+  }
   revalidateTeamPages();
 }
 

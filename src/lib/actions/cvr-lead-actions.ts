@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { FOLLOW_UP_DATE_RE, formatFollowUpDate } from "@/lib/followup";
+import { notifyTeam, notifyUser, pipelineHref } from "@/lib/notifications";
 
 async function requireUser() {
   const session = await auth();
@@ -28,6 +30,7 @@ function revalidateTeamPages() {
   revalidatePath("/virksomheder");
   revalidatePath("/dashboard");
   revalidatePath("/team");
+  revalidatePath("/pipeline");
 }
 
 async function requireCvrCompany(cvrNummer: string) {
@@ -41,25 +44,74 @@ export async function setCvrLeadStatusAction(teamId: string, cvrNummer: string, 
   await requireMembership(teamId, user.id);
   const company = await requireCvrCompany(cvrNummer);
 
-  await prisma.cvrTeamLead.upsert({
+  // Same closed-deal and claim-on-status-change rules as setLeadStatusAction.
+  const closed = status === "won" || status === "lost";
+  const lead = await prisma.cvrTeamLead.upsert({
     where: { teamId_cvrNummer: { teamId, cvrNummer } },
-    update: { status },
+    update: { status, ...(closed ? { followUpAt: null } : {}) },
     create: { teamId, cvrNummer, status },
   });
-  // Same claim-on-status-change rule as setLeadStatusAction.
   const claimed =
     status !== "new"
       ? (await prisma.cvrTeamLead.updateMany({ where: { teamId, cvrNummer, assigneeId: null }, data: { assigneeId: user.id } })).count > 0
       : false;
+  const label = STATUS_LABELS[status] ?? status;
+  const actorName = user.name ?? "Ukendt";
+  const companyName = company.navn ?? `CVR ${cvrNummer}`;
   await prisma.activityLog.create({
     data: {
       teamId,
       userId: user.id,
-      who: user.name ?? "Ukendt",
-      action: `satte status til "${STATUS_LABELS[status] ?? status}"${claimed ? " og tildelte sig selv" : ""} for`,
-      companyName: company.navn ?? `CVR ${cvrNummer}`,
+      who: actorName,
+      action: `satte status til "${label}"${claimed ? " og tildelte sig selv" : ""} for`,
+      companyName,
     },
   });
+  const notification = { teamId, actorId: user.id, actorName, companyName, href: pipelineHref("cvr", cvrNummer) };
+  if (status === "meeting" || status === "won") {
+    await notifyTeam({ ...notification, text: status === "won" ? "vandt" : "bookede et møde med" });
+  } else {
+    await notifyUser(lead.assigneeId, { ...notification, text: `satte status til "${label}" på din virksomhed` });
+  }
+  revalidateTeamPages();
+}
+
+export async function setCvrFollowUpAction(teamId: string, cvrNummer: string, date: string | null) {
+  const user = await requireUser();
+  await requireMembership(teamId, user.id);
+  if (date !== null && !FOLLOW_UP_DATE_RE.test(date)) throw new Error("Ugyldig dato.");
+  const company = await requireCvrCompany(cvrNummer);
+
+  const followUpAt = date ? new Date(`${date}T00:00:00.000Z`) : null;
+  const lead = await prisma.cvrTeamLead.upsert({
+    where: { teamId_cvrNummer: { teamId, cvrNummer } },
+    update: { followUpAt },
+    create: { teamId, cvrNummer, followUpAt },
+  });
+  const claimed = date
+    ? (await prisma.cvrTeamLead.updateMany({ where: { teamId, cvrNummer, assigneeId: null }, data: { assigneeId: user.id } })).count > 0
+    : false;
+  const actorName = user.name ?? "Ukendt";
+  const companyName = company.navn ?? `CVR ${cvrNummer}`;
+  await prisma.activityLog.create({
+    data: {
+      teamId,
+      userId: user.id,
+      who: actorName,
+      action: date ? `satte opfølgning til ${formatFollowUpDate(date)}${claimed ? " og tildelte sig selv" : ""} for` : "fjernede opfølgningen for",
+      companyName,
+    },
+  });
+  if (date) {
+    await notifyUser(lead.assigneeId, {
+      teamId,
+      actorId: user.id,
+      actorName,
+      text: `satte opfølgning til ${formatFollowUpDate(date)} på din virksomhed`,
+      companyName,
+      href: pipelineHref("cvr", cvrNummer),
+    });
+  }
   revalidateTeamPages();
 }
 

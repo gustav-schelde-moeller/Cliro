@@ -85,6 +85,7 @@ export function ListsView({
     leadOf,
     handleToggleStar,
     handleSetStatus,
+    handleSetFollowUp,
     handleAssign,
     handleRelease,
     handleToggleList,
@@ -95,6 +96,7 @@ export function ListsView({
     teamLists: cvrTeamLists,
     analyzingFor,
     handleSetStatus: handleCvrSetStatus,
+    handleSetFollowUp: handleCvrSetFollowUp,
     handleAssign: handleCvrAssign,
     handleRelease: handleCvrRelease,
     handleToggleStar: handleCvrToggleStar,
@@ -418,6 +420,7 @@ export function ListsView({
           onClose={() => setSelectedId(null)}
           onToggleStar={() => handleToggleStar(selectedCompany.id)}
           onSetStatus={(status) => handleSetStatus(selectedCompany.id, status)}
+          onSetFollowUp={(date) => handleSetFollowUp(selectedCompany.id, date)}
           onAssign={() => handleAssign(selectedCompany.id)}
           onRelease={() => handleRelease(selectedCompany.id)}
           onToggleList={(listId) => handleToggleList(selectedCompany.id, listId)}
@@ -434,6 +437,7 @@ export function ListsView({
           onClose={() => setSelectedCvr(null)}
           onToggleStar={() => handleCvrToggleStar(selectedCvr)}
           onSetStatus={(status) => handleCvrSetStatus(selectedCvr, status)}
+          onSetFollowUp={(date) => handleCvrSetFollowUp(selectedCvr, date)}
           onAssign={() => handleCvrAssign(selectedCvr)}
           onRelease={() => handleCvrRelease(selectedCvr)}
           onToggleList={(listId) => handleCvrToggleList(selectedCvr, listId)}
