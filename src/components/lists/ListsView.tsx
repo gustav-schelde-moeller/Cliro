@@ -195,6 +195,150 @@ export function ListsView({
     });
   }
 
+  const sections = [
+    { key: "mine", title: "Mine lister", items: lists.filter((l) => l.isMine), empty: "Du har ikke oprettet nogen lister endnu." },
+    { key: "team", title: "Team-lister", items: lists.filter((l) => !l.isMine), empty: "Ingen andre i teamet har delt en liste endnu." },
+  ];
+
+  function renderList(list: ListItem, i: number) {
+    const isExpanded = expandedIds.has(list.id);
+    const canEdit = list.isMine || (!list.isPrivate && list.teamCanEdit);
+    return (
+      <div
+        className="panel-card list-card-anim"
+        style={{ marginBottom: 16, animationDelay: `${Math.min(i, 8) * 40}ms` }}
+        key={list.id}
+      >
+        <div className="list-header-row" onClick={() => toggleExpanded(list.id)}>
+          <div className="list-header-title">
+            <svg
+              className={`list-chevron${isExpanded ? " open" : ""}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              width={14}
+              height={14}
+            >
+              <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <h3 className="list-name-link">{list.name}</h3>
+            <span className="tag">
+              {list.companies.length + list.cvrCompanies.length} {list.companies.length + list.cvrCompanies.length === 1 ? "virksomhed" : "virksomheder"}
+            </span>
+            {list.isPrivate ? <span className="tag">🔒 Privat</span> : null}
+          </div>
+          <div className="list-header-actions" onClick={(e) => e.stopPropagation()}>
+            <ListActionsMenu
+              listId={list.id}
+              listName={list.name}
+              isPrivate={list.isPrivate}
+              isMine={list.isMine}
+              teamCanEdit={list.teamCanEdit}
+              onToggleVisibility={() => handleToggleVisibility(list.id)}
+              onToggleTeamEdit={() => handleToggleTeamEdit(list.id)}
+              onDelete={() => handleDelete(list.id)}
+            />
+          </div>
+        </div>
+        {!list.isMine && list.createdByName ? <div className="distance-note list-created-note">Oprettet af {list.createdByName}</div> : null}
+        <div className={`list-body-wrap${isExpanded ? " expanded" : ""}`}>
+          <div>
+            {list.companies.length === 0 && list.cvrCompanies.length === 0 ? (
+              <div className="dash-empty" style={{ marginTop: 12 }}>
+                Ingen virksomheder i denne liste endnu.
+              </div>
+            ) : null}
+            {list.companies.length > 0 || list.cvrCompanies.length > 0 ? (
+              <div className="list-table-wrap" style={{ marginTop: 12 }}>
+                <table className="list-table">
+                  <thead>
+                    <tr>
+                      <th>Navn</th>
+                      <th>Branche</th>
+                      <th>By</th>
+                      <th>Score</th>
+                      <th>Købekraft</th>
+                      <th>Kontakt</th>
+                      <th>Telefon</th>
+                      <th>Email</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.companies.map((c) => (
+                      <tr
+                        key={`lead-${c.id}`}
+                        className={`list-table-row${companyDrawerOpen ? " list-table-row-disabled" : ""}`}
+                        onClick={companyDrawerOpen ? undefined : () => setSelectedId(c.id)}
+                      >
+                        <td className="cell-primary" data-label="Navn">{c.name}</td>
+                        <td data-label="Branche">{c.industry}</td>
+                        <td data-label="By">{c.city}</td>
+                        <td data-label="Score">{displayScore(c)}</td>
+                        <td data-label="Købekraft">—</td>
+                        <td data-label="Kontakt">{c.contact.name ?? "—"}</td>
+                        <td data-label="Telefon">—</td>
+                        <td data-label="Email">{c.contact.email ?? "—"}</td>
+                        <td>
+                          {canEdit ? (
+                            <button
+                              type="button"
+                              className="btn"
+                              disabled={isPending || companyDrawerOpen}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveCompany(list.id, c.id);
+                              }}
+                            >
+                              Fjern
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                    {list.cvrCompanies.map((c) => {
+                      const openable = cvrRows.some((r) => r.cvrNummer === c.cvrNummer) && !companyDrawerOpen;
+                      return (
+                        <tr
+                          key={`cvr-${c.cvrNummer}`}
+                          className={`list-table-row${openable ? "" : " list-table-row-disabled"}`}
+                          onClick={openable ? () => openCvrByNummer(c.cvrNummer) : undefined}
+                        >
+                          <td className="cell-primary" data-label="Navn">{c.navn || "Ukendt navn"}</td>
+                          <td data-label="Branche">{c.brancheTekst ?? "—"}</td>
+                          <td data-label="By">{c.kommunenavn ?? "—"}</td>
+                          <td data-label="Score">—</td>
+                          <td data-label="Købekraft">{c.koebekraftScore ?? "—"}</td>
+                          <td data-label="Kontakt">—</td>
+                          <td data-label="Telefon">{c.telefon ?? "—"}</td>
+                          <td data-label="Email">{c.email ?? "—"}</td>
+                          <td>
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                className="btn"
+                                disabled={isPending || companyDrawerOpen}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveCvrCompany(list.id, c.cvrNummer);
+                                }}
+                              >
+                                Fjern
+                              </button>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <section>
       <div className="lists-create-bar">
@@ -245,144 +389,20 @@ export function ListsView({
           </div>
         </div>
       ) : (
-        lists.map((list, i) => {
-          const isExpanded = expandedIds.has(list.id);
-          const canEdit = list.isMine || (!list.isPrivate && list.teamCanEdit);
-          return (
-            <div
-              className="panel-card list-card-anim"
-              style={{ marginBottom: 16, animationDelay: `${Math.min(i, 8) * 40}ms` }}
-              key={list.id}
-            >
-              <div className="list-header-row" onClick={() => toggleExpanded(list.id)}>
-                <div className="list-header-title">
-                  <svg
-                    className={`list-chevron${isExpanded ? " open" : ""}`}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    width={14}
-                    height={14}
-                  >
-                    <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <h3 className="list-name-link">{list.name}</h3>
-                  <span className="tag">
-                    {list.companies.length + list.cvrCompanies.length} {list.companies.length + list.cvrCompanies.length === 1 ? "virksomhed" : "virksomheder"}
-                  </span>
-                  {list.isPrivate ? <span className="tag">🔒 Privat</span> : null}
-                </div>
-                <div className="list-header-actions" onClick={(e) => e.stopPropagation()}>
-                  <ListActionsMenu
-                    listId={list.id}
-                    listName={list.name}
-                    isPrivate={list.isPrivate}
-                    isMine={list.isMine}
-                    teamCanEdit={list.teamCanEdit}
-                    onToggleVisibility={() => handleToggleVisibility(list.id)}
-                    onToggleTeamEdit={() => handleToggleTeamEdit(list.id)}
-                    onDelete={() => handleDelete(list.id)}
-                  />
-                </div>
-              </div>
-              {list.createdByName ? <div className="distance-note list-created-note">Oprettet af {list.createdByName}</div> : null}
-              <div className={`list-body-wrap${isExpanded ? " expanded" : ""}`}>
-                <div>
-                  {list.companies.length === 0 && list.cvrCompanies.length === 0 ? (
-                    <div className="dash-empty" style={{ marginTop: 12 }}>
-                      Ingen virksomheder i denne liste endnu.
-                    </div>
-                  ) : null}
-                  {list.companies.length > 0 || list.cvrCompanies.length > 0 ? (
-                    <div className="list-table-wrap" style={{ marginTop: 12 }}>
-                      <table className="list-table">
-                        <thead>
-                          <tr>
-                            <th>Navn</th>
-                            <th>Branche</th>
-                            <th>By</th>
-                            <th>Score</th>
-                            <th>Købekraft</th>
-                            <th>Kontakt</th>
-                            <th>Telefon</th>
-                            <th>Email</th>
-                            <th />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {list.companies.map((c) => (
-                            <tr
-                              key={`lead-${c.id}`}
-                              className={`list-table-row${companyDrawerOpen ? " list-table-row-disabled" : ""}`}
-                              onClick={companyDrawerOpen ? undefined : () => setSelectedId(c.id)}
-                            >
-                              <td className="cell-primary" data-label="Navn">{c.name}</td>
-                              <td data-label="Branche">{c.industry}</td>
-                              <td data-label="By">{c.city}</td>
-                              <td data-label="Score">{displayScore(c)}</td>
-                              <td data-label="Købekraft">—</td>
-                              <td data-label="Kontakt">{c.contact.name ?? "—"}</td>
-                              <td data-label="Telefon">—</td>
-                              <td data-label="Email">{c.contact.email ?? "—"}</td>
-                              <td>
-                                {canEdit ? (
-                                  <button
-                                    type="button"
-                                    className="btn"
-                                    disabled={isPending || companyDrawerOpen}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveCompany(list.id, c.id);
-                                    }}
-                                  >
-                                    Fjern
-                                  </button>
-                                ) : null}
-                              </td>
-                            </tr>
-                          ))}
-                          {list.cvrCompanies.map((c) => {
-                            const openable = cvrRows.some((r) => r.cvrNummer === c.cvrNummer) && !companyDrawerOpen;
-                            return (
-                              <tr
-                                key={`cvr-${c.cvrNummer}`}
-                                className={`list-table-row${openable ? "" : " list-table-row-disabled"}`}
-                                onClick={openable ? () => openCvrByNummer(c.cvrNummer) : undefined}
-                              >
-                                <td className="cell-primary" data-label="Navn">{c.navn || "Ukendt navn"}</td>
-                                <td data-label="Branche">{c.brancheTekst ?? "—"}</td>
-                                <td data-label="By">{c.kommunenavn ?? "—"}</td>
-                                <td data-label="Score">—</td>
-                                <td data-label="Købekraft">{c.koebekraftScore ?? "—"}</td>
-                                <td data-label="Kontakt">—</td>
-                                <td data-label="Telefon">{c.telefon ?? "—"}</td>
-                                <td data-label="Email">{c.email ?? "—"}</td>
-                                <td>
-                                  {canEdit ? (
-                                    <button
-                                      type="button"
-                                      className="btn"
-                                      disabled={isPending || companyDrawerOpen}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemoveCvrCompany(list.id, c.cvrNummer);
-                                      }}
-                                    >
-                                      Fjern
-                                    </button>
-                                  ) : null}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
+        sections.map((section, sectionIndex) => (
+          <div key={section.key} style={sectionIndex > 0 ? { marginTop: 28 } : undefined}>
+            <div className="section-label" style={{ marginTop: 0 }}>
+              {section.title} · {section.items.length}
             </div>
-          );
-        })
+            {section.items.length === 0 ? (
+              <div className="panel-card list-card-anim" style={{ marginBottom: 16 }}>
+                <div className="dash-empty">{section.empty}</div>
+              </div>
+            ) : (
+              section.items.map(renderList)
+            )}
+          </div>
+        ))
       )}
 
       {selectedCompany ? (
